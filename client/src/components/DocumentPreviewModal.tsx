@@ -64,7 +64,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   }, [isOpen, files, initialFileIndex]);
 
   const activeFile = files[selectedFileIdx] || files[0];
-  const activeUrl = objectUrls[selectedFileIdx] || activeFile?.previewUrl || activeFile?.url || '';
+  let activeUrl = objectUrls[selectedFileIdx] || activeFile?.previewUrl || activeFile?.url || '';
+
+  if (activeUrl && !activeUrl.startsWith('blob:') && !activeUrl.startsWith('http://') && !activeUrl.startsWith('https://')) {
+    const baseHost = (import.meta as any).env?.VITE_API_URL || window.location.origin;
+    const cleanedBase = baseHost.replace(/\/api\/?$/, '');
+    activeUrl = `${cleanedBase}${activeUrl.startsWith('/') ? '' : '/'}${activeUrl}`;
+  }
 
   const totalPages = files.reduce((sum, f) => sum + (f.pageCount || 1), 0);
   const isBwMode = settings.colorMode === 'bw';

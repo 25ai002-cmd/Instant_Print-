@@ -85,7 +85,7 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
       const docItem = {
         id: crypto.randomUUID(),
         filePath: file.path,
-        url: `/uploads/${path.basename(file.path)}`,
+        url: `/uploads/${sessionId}/${path.basename(file.path)}`,
         fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,

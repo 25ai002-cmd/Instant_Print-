@@ -44,7 +44,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve temporary uploads directory statically
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+const uploadsStaticPath = path.resolve(process.env.UPLOAD_DIR || './uploads');
+app.use('/uploads', express.static(uploadsStaticPath));
 
 // Request Logger
 app.use((req, _res, next) => {

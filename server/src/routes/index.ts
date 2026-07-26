@@ -4,7 +4,7 @@
 // ============================================================
 
 import { Router } from 'express';
-import { createSession, getSession, deleteSession } from '../controllers/sessionController.js';
+import { createSession, getSession, deleteSession, getSessionFile } from '../controllers/sessionController.js';
 import { uploadFile } from '../controllers/uploadController.js';
 import { calculatePriceHandler } from '../controllers/priceController.js';
 import { createPayment, verifyPayment } from '../controllers/paymentController.js';
@@ -19,6 +19,7 @@ const router = Router();
 // ── Session Routes ──────────────────────────────────────────
 router.post('/sessions', createSession);
 router.get('/sessions/:sessionId', getSession);
+router.get('/sessions/:sessionId/files/:fileName', getSessionFile);
 router.delete('/sessions/:sessionId', deleteSession);
 
 // ── Upload Routes ───────────────────────────────────────────
