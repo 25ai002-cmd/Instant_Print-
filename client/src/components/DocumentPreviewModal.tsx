@@ -135,35 +135,45 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   // Render DOCX file with headers, footers, watermarks, shapes & borders enabled
   useEffect(() => {
-    if (isDocx && activeFile?.fileObj && docxContainerRef.current && !useOfficeEngine) {
+    if (isDocx && docxContainerRef.current && !useOfficeEngine && (activeFile?.fileObj || activeUrl)) {
       setIsDocxRendering(true);
       setRenderedDocxPages(null);
       const targetContainer = docxContainerRef.current;
       targetContainer.innerHTML = '';
 
-      activeFile.fileObj.arrayBuffer().then((buffer) => {
-        renderAsync(buffer, targetContainer, undefined, {
-          inWrapper: true,
-          ignoreWidth: false,
-          ignoreHeight: false,
-          className: 'docx-preview-sheet-wrapper',
-          renderHeaders: true,
-          renderFooters: true,
-          renderFootnotes: true,
-          renderEndnotes: true,
-          experimental: true,
-        } as any)
-          .then(() => {
-            const count = targetContainer.querySelectorAll('section').length;
-            if (count > 0) {
-              setRenderedDocxPages(count);
-            }
-          })
-          .catch((err) => console.warn('[DOCX Render Warning]:', err))
-          .finally(() => setIsDocxRendering(false));
-      }).catch(() => setIsDocxRendering(false));
+      const getBuffer = (): Promise<ArrayBuffer> => {
+        if (activeFile?.fileObj) {
+          return activeFile.fileObj.arrayBuffer();
+        }
+        // Fetch from server when no local fileObj (e.g. after upload)
+        return fetch(activeUrl).then((r) => {
+          if (!r.ok) throw new Error(`Fetch failed: ${r.status}`);
+          return r.arrayBuffer();
+        });
+      };
+
+      getBuffer()
+        .then((buffer) => {
+          return renderAsync(buffer, targetContainer, undefined, {
+            inWrapper: true,
+            ignoreWidth: false,
+            ignoreHeight: false,
+            className: 'docx-preview-sheet-wrapper',
+            renderHeaders: true,
+            renderFooters: true,
+            renderFootnotes: true,
+            renderEndnotes: true,
+            experimental: true,
+          } as any);
+        })
+        .then(() => {
+          const count = targetContainer.querySelectorAll('section').length;
+          if (count > 0) setRenderedDocxPages(count);
+        })
+        .catch((err) => console.warn('[DOCX Render Warning]:', err))
+        .finally(() => setIsDocxRendering(false));
     }
-  }, [selectedFileIdx, activeFile, isDocx, useOfficeEngine]);
+  }, [selectedFileIdx, activeFile, activeUrl, isDocx, useOfficeEngine]);
 
   if (!isOpen || !files.length || !activeFile) return null;
 
