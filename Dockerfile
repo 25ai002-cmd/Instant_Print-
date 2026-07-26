@@ -19,8 +19,10 @@ COPY . .
 # Build Client production bundle, Prisma client, and Server TS
 RUN npm run build
 
-# Production runner image
+# Production runner image with LibreOffice for PDF conversion
 FROM node:20-alpine
+
+RUN apk add --no-cache libreoffice font-dejavu ttf-droid ttf-freefont ttf-liberation
 
 WORKDIR /app
 

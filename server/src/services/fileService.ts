@@ -8,7 +8,80 @@
 import fs from 'fs/promises';
 import path from 'path';
 import pdfParse from 'pdf-parse';
+import { PDFDocument } from 'pdf-lib';
+import libre from 'libreoffice-convert';
+import util from 'util';
+import { exec } from 'child_process';
 import type { DocumentAnalysis, Orientation, PaperSize } from '../types/index.js';
+
+const libreConvert = util.promisify(libre.convert);
+const execAsync = util.promisify(exec);
+
+/**
+ * Convert any uploaded file (.docx, .pptx, .png, .jpg, .jpeg, .webp) to PDF internally
+ */
+export async function convertToPdf(filePath: string, mimeType: string): Promise<string> {
+  const ext = path.extname(filePath).toLowerCase();
+
+  // If already PDF, return original file path
+  if (ext === '.pdf' || mimeType === 'application/pdf') {
+    return filePath;
+  }
+
+  const pdfPath = `${filePath}.pdf`;
+
+  // 1. Convert Images (PNG, JPG, WEBP) -> PDF
+  if (mimeType.startsWith('image/') || ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
+    try {
+      const pdfDoc = await PDFDocument.create();
+      const imageBytes = await fs.readFile(filePath);
+      let image;
+      if (ext === '.png' || mimeType === 'image/png') {
+        image = await pdfDoc.embedPng(imageBytes);
+      } else {
+        image = await pdfDoc.embedJpg(imageBytes);
+      }
+      const page = pdfDoc.addPage([image.width, image.height]);
+      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+
+      const pdfBytes = await pdfDoc.save();
+      await fs.writeFile(pdfPath, pdfBytes);
+      console.log(`[PDF Converter] Converted image ${filePath} -> ${pdfPath}`);
+      return pdfPath;
+    } catch (err) {
+      console.warn('[PDF Converter] Image to PDF conversion warning:', err);
+      return filePath;
+    }
+  }
+
+  // 2. Convert Office Docs (.docx, .pptx) -> PDF
+  if (mimeType.includes('officedocument') || ['.docx', '.pptx', '.doc', '.ppt'].includes(ext)) {
+    try {
+      // Primary: libreoffice-convert buffer conversion
+      const docBuffer = await fs.readFile(filePath);
+      const pdfBuffer = await libreConvert(docBuffer, '.pdf', undefined);
+      await fs.writeFile(pdfPath, pdfBuffer);
+      console.log(`[PDF Converter] Converted office doc ${filePath} -> ${pdfPath}`);
+      return pdfPath;
+    } catch (libreErr) {
+      console.warn('[PDF Converter] libreoffice-convert buffer failed, trying CLI...', libreErr);
+      try {
+        const outDir = path.dirname(filePath);
+        await execAsync(`libreoffice --headless --convert-to pdf --outdir "${outDir}" "${filePath}"`);
+        const generatedPdf = filePath.replace(/\.[^/.]+$/, '.pdf');
+        const exists = await fs.stat(generatedPdf).then(() => true).catch(() => false);
+        if (exists) {
+          console.log(`[PDF Converter] Converted CLI office doc ${filePath} -> ${generatedPdf}`);
+          return generatedPdf;
+        }
+      } catch (cliErr) {
+        console.warn('[PDF Converter] CLI libreoffice conversion unavailable:', cliErr);
+      }
+    }
+  }
+
+  return filePath;
+}
 
 /** Map extensions to canonical MIME types */
 export const EXT_TO_MIME: Record<string, string> = {
