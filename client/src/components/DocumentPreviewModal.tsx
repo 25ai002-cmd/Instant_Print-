@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Settings as SettingsIcon, Printer, FileText, Image as ImageIcon, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { X, Settings as SettingsIcon, Printer, FileText, Image as ImageIcon, Loader2, ZoomIn, ZoomOut, RotateCcw, Monitor } from 'lucide-react';
 import { renderAsync } from 'docx-preview';
 import type { PrintSettings } from '../types/index.js';
 
@@ -36,6 +36,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [selectedFileIdx, setSelectedFileIdx] = useState<number>(initialFileIndex);
   const [objectUrls, setObjectUrls] = useState<Record<number, string>>({});
   const [isDocxRendering, setIsDocxRendering] = useState<boolean>(false);
+  const [renderedDocxPages, setRenderedDocxPages] = useState<number | null>(null);
+  const [useOfficeEngine, setUseOfficeEngine] = useState<boolean>(false);
   const [zoomScale, setZoomScale] = useState<number>(100);
   const docxContainerRef = useRef<HTMLDivElement>(null);
 
@@ -73,9 +75,6 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     activeUrl = `${cleanedBase}${activeUrl.startsWith('/') ? '' : '/'}${activeUrl}`;
   }
 
-  const totalDocPages = activeFile?.pageCount || 1;
-  const isBwMode = settings.colorMode === 'bw';
-
   const isImg = activeFile?.mimeType?.startsWith('image/') ||
     activeFile?.fileName?.match(/\.(png|jpe?g|webp|gif|bmp)$/i);
   const isPdf = activeFile?.mimeType === 'application/pdf' ||
@@ -83,10 +82,16 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const isDocx = activeFile?.mimeType?.includes('wordprocessingml') ||
     activeFile?.fileName?.toLowerCase().endsWith('.docx');
 
-  // Render DOCX file natively using docx-preview for all pages
+  const isOnlineUrl = activeUrl.startsWith('http://') || activeUrl.startsWith('https://');
+
+  const totalDocPages = renderedDocxPages || activeFile?.pageCount || 1;
+  const isBwMode = settings.colorMode === 'bw';
+
+  // Render DOCX file with headers, footers, watermarks, shapes & borders enabled
   useEffect(() => {
-    if (isDocx && activeFile?.fileObj && docxContainerRef.current) {
+    if (isDocx && activeFile?.fileObj && docxContainerRef.current && !useOfficeEngine) {
       setIsDocxRendering(true);
+      setRenderedDocxPages(null);
       const targetContainer = docxContainerRef.current;
       targetContainer.innerHTML = '';
 
@@ -96,12 +101,23 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           ignoreWidth: false,
           ignoreHeight: false,
           className: 'docx-preview-sheet-wrapper',
-        })
-          .catch((err) => console.warn('[DOCX Preview Warning]:', err))
+          renderHeaders: true,
+          renderFooters: true,
+          renderFootnotes: true,
+          renderEndnotes: true,
+          experimental: true,
+        } as any)
+          .then(() => {
+            const count = targetContainer.querySelectorAll('section').length;
+            if (count > 0) {
+              setRenderedDocxPages(count);
+            }
+          })
+          .catch((err) => console.warn('[DOCX Render Warning]:', err))
           .finally(() => setIsDocxRendering(false));
       }).catch(() => setIsDocxRendering(false));
     }
-  }, [selectedFileIdx, activeFile, isDocx]);
+  }, [selectedFileIdx, activeFile, isDocx, useOfficeEngine]);
 
   if (!isOpen || !files.length || !activeFile) return null;
 
@@ -124,7 +140,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         backgroundColor: '#0f172a',
         borderRadius: '16px',
         width: '100%',
-        maxWidth: '920px',
+        maxWidth: '940px',
         height: '94vh',
         display: 'flex',
         flexDirection: 'column',
@@ -136,7 +152,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         <div style={{
           backgroundColor: '#0f172a',
           color: 'white',
-          padding: '16px 24px',
+          padding: '14px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -185,7 +201,30 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Microsoft Office Web Viewer Toggle if online URL */}
+            {isDocx && isOnlineUrl && (
+              <button
+                onClick={() => setUseOfficeEngine(!useOfficeEngine)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: useOfficeEngine ? '#38bdf8' : '#1e293b',
+                  color: useOfficeEngine ? '#0f172a' : '#cbd5e1',
+                  border: '1px solid #334155',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                <Monitor size={14} />
+                {useOfficeEngine ? 'MS Office Viewer' : 'High-Res Preview'}
+              </button>
+            )}
+
             {/* Zoom Controls */}
             <div style={{
               display: 'flex',
@@ -339,8 +378,31 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 }}
               />
             </div>
+          ) : isDocx && useOfficeEngine && isOnlineUrl ? (
+            /* Microsoft Office Web Viewer for 100% Exact Word Rendering with Watermarks & Boxes */
+            <div style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              backgroundColor: '#ffffff',
+              boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
+              filter: isBwMode ? 'grayscale(100%)' : 'none',
+            }}>
+              <iframe
+                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activeUrl)}`}
+                title={activeFile.fileName}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  minHeight: '560px',
+                  border: 'none',
+                  backgroundColor: '#ffffff',
+                }}
+              />
+            </div>
           ) : isDocx ? (
-            /* Real DOCX Word Document Rendered Pages (All Pages Continuous Scroll) */
+            /* Real DOCX Word Document Rendered Pages (Headers, Footers, Watermarks & Boxes Enabled) */
             <div style={{
               width: '100%',
               display: 'flex',
@@ -362,14 +424,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   fontWeight: 600,
                 }}>
                   <Loader2 className="animate-spin" size={22} color="#38bdf8" />
-                  Rendering {totalDocPages > 1 ? `${totalDocPages} Word Document Pages...` : 'Word Document...'}
+                  Rendering Word Document & Watermarks...
                 </div>
               )}
               <div
                 ref={docxContainerRef}
                 style={{
                   width: '100%',
-                  maxWidth: '800px',
+                  maxWidth: '820px',
                   filter: isBwMode ? 'grayscale(100%)' : 'none',
                   boxSizing: 'border-box',
                 }}
@@ -402,7 +464,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               />
             </div>
           ) : (
-            /* General Office Presentation Preview Card */
+            /* General Presentation Preview Card */
             <div style={{
               width: '100%',
               maxWidth: '540px',

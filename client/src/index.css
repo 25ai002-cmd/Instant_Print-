@@ -290,9 +290,24 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 4px !important;
   margin-bottom: 24px !important;
   box-sizing: border-box !important;
+  position: relative !important;
 }
 
 .docx-wrapper {
   background: transparent !important;
   padding: 0 !important;
+}
+
+/* Ensure Headers, Footers, Watermarks & Drawings display correctly */
+.docx-wrapper header,
+.docx-wrapper footer {
+  position: relative;
+  width: 100%;
+  opacity: 0.9;
+}
+
+.docx-wrapper svg,
+.docx-wrapper img,
+.docx-wrapper table {
+  max-width: 100% !important;
 }
