@@ -3,18 +3,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package manifests
+# Copy root and package manifests
 COPY package*.json ./
 COPY client/package*.json ./client/
 COPY server/package*.json ./server/
 
-# Install all dependencies
-RUN npm run install:all
+# Install all dependencies across workspaces
+RUN npm install
+RUN cd client && npm install
+RUN cd server && npm install
 
-# Copy source files
+# Copy all source files
 COPY . .
 
-# Build Client, Prisma, and Server
+# Build Client production bundle, Prisma client, and Server TS
 RUN npm run build
 
 # Production runner image
@@ -24,6 +26,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=10000
+ENV DATABASE_URL="file:./dev.db"
 
 # Copy built application from builder stage
 COPY --from=builder /app /app
