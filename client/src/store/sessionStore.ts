@@ -46,6 +46,7 @@ interface SessionState {
   uploadFile: (files: File | File[]) => Promise<void>;
   updateSettingsAndCalculatePrice: (settings: Partial<PrintSettings>) => Promise<void>;
   generatePayment: () => Promise<void>;
+  prewarmPayment: () => Promise<void>; // Pre-creates payment order silently in background
   setPaymentSuccess: (paymentId: string, signature: string) => Promise<void>;
   triggerPrint: () => Promise<void>;
   pollPrintJob: () => Promise<boolean>; // Returns true if completed
@@ -119,7 +120,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { sessionId, settings } = get();
     if (!sessionId) return;
     const mergedSettings = { ...settings, ...newSettings };
-    set({ settings: mergedSettings, loading: true });
+    // Invalidate any pre-warmed payment order since price may change
+    set({ settings: mergedSettings, loading: true, paymentInfo: null });
     try {
       const data = await apiService.calculatePrice(sessionId, mergedSettings);
       set({
@@ -131,9 +133,32 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
+  prewarmPayment: async () => {
+    const { sessionId, paymentInfo, priceBreakdown } = get();
+    // Skip if already have a pending payment order, no session, or no price yet
+    if (!sessionId || !priceBreakdown || paymentInfo) return;
+    try {
+      const data = await apiService.createPayment(sessionId);
+      // Only store if the user hasn't already triggered generatePayment
+      if (!get().paymentInfo) {
+        set({ paymentInfo: data });
+      }
+    } catch (err) {
+      // Silently fail — generatePayment will retry on click
+      console.warn('[prewarmPayment] Silent pre-warm failed:', err);
+    }
+  },
+
   generatePayment: async () => {
-    const { sessionId } = get();
+    const { sessionId, paymentInfo } = get();
     if (!sessionId) return;
+
+    // If payment was already pre-warmed, skip API call and navigate instantly
+    if (paymentInfo) {
+      set({ currentScreen: 'payment', error: null });
+      return;
+    }
+
     set({ loading: true, error: null });
     try {
       const data = await apiService.createPayment(sessionId);

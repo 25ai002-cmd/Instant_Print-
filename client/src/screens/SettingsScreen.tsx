@@ -55,11 +55,22 @@ export const SettingsScreen: React.FC = () => {
     priceBreakdown,
     updateSettingsAndCalculatePrice,
     generatePayment,
+    prewarmPayment,
     setScreen,
     cancelSession,
   } = useSessionStore();
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Pre-warm payment order silently in background so "Proceed to Pay" is instant.
+  // Debounced by 800ms — fires once the user stops tweaking settings.
+  useEffect(() => {
+    if (!priceBreakdown) return;
+    const timer = setTimeout(() => {
+      prewarmPayment();
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [priceBreakdown]);
 
   const maxPages = analysis?.pageCount || 1;
 
