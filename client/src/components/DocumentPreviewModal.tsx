@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Settings as SettingsIcon, Printer, FileText, Image as ImageIcon, Loader2, ZoomIn, ZoomOut, RotateCcw, Monitor } from 'lucide-react';
 import { renderAsync } from 'docx-preview';
+import { apiService } from '../services/api.js';
 import type { PrintSettings } from '../types/index.js';
 
 export interface PreviewFileItem {
@@ -22,6 +23,7 @@ interface DocumentPreviewModalProps {
   initialFileIndex?: number;
   onConfirmPrint?: () => void;
   onOpenSettings?: () => void;
+  sessionId?: string;
 }
 
 /**
@@ -66,6 +68,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   initialFileIndex = 0,
   onConfirmPrint,
   onOpenSettings,
+  sessionId,
 }) => {
   const [selectedFileIdx, setSelectedFileIdx] = useState<number>(initialFileIndex);
   const [objectUrls, setObjectUrls] = useState<Record<number, string>>({});
@@ -73,6 +76,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [renderedDocxPages, setRenderedDocxPages] = useState<number | null>(null);
   const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
   const [useOfficeEngine, setUseOfficeEngine] = useState<boolean>(false);
+  const [convertedPdfUrl, setConvertedPdfUrl] = useState<string | null>(null);
+  const [isConverting, setIsConverting] = useState<boolean>(false);
   const [zoomScale, setZoomScale] = useState<number>(100);
   const docxContainerRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +123,40 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     activeFile?.fileName?.toLowerCase().endsWith('.docx');
 
   const isOnlineUrl = activeUrl.startsWith('http://') || activeUrl.startsWith('https://');
+
+  // Effective URL — use converted PDF URL if available
+  const effectivePdfUrl = convertedPdfUrl
+    ? (() => {
+        const base = (import.meta as any).env?.VITE_API_URL
+          ? ((import.meta as any).env.VITE_API_URL as string).replace(/\/api\/?$/, '')
+          : window.location.origin.includes('5173') ? 'http://localhost:3002' : window.location.origin;
+        return `${base}${convertedPdfUrl}`;
+      })()
+    : null;
+
+  const isShowingPdf = !!effectivePdfUrl || (isPdf && !!activeUrl);
+  const isShowingDocx = isDocx && !effectivePdfUrl;
+
+  // On-demand convert to PDF for pixel-perfect preview (watermarks, boxes, etc.)
+  const convertAndPreview = async () => {
+    if (!sessionId || !activeFile?.id) return;
+    setIsConverting(true);
+    try {
+      const result = await apiService.convertPreview(sessionId, activeFile.id);
+      if (result.pdfUrl) {
+        setConvertedPdfUrl(result.pdfUrl);
+      }
+    } catch (err) {
+      console.warn('[ConvertPreview] Error:', err);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  // Reset converted PDF when switching files
+  useEffect(() => {
+    setConvertedPdfUrl(null);
+  }, [selectedFileIdx]);
 
   // Extract PDF page count on client
   useEffect(() => {
@@ -261,27 +300,42 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* Microsoft Office Web Viewer Toggle if online URL */}
-            {isDocx && isOnlineUrl && (
+            {/* High-Res Preview: convert DOCX to PDF on server for 100% fidelity watermarks & boxes */}
+            {isDocx && !effectivePdfUrl && (
               <button
-                onClick={() => setUseOfficeEngine(!useOfficeEngine)}
+                onClick={convertAndPreview}
+                disabled={isConverting}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  backgroundColor: useOfficeEngine ? '#38bdf8' : '#1e293b',
-                  color: useOfficeEngine ? '#0f172a' : '#cbd5e1',
+                  backgroundColor: isConverting ? '#334155' : '#1e293b',
+                  color: isConverting ? '#64748b' : '#38bdf8',
                   border: '1px solid #334155',
-                  padding: '6px 12px',
+                  padding: '6px 14px',
                   borderRadius: '8px',
                   fontSize: '12px',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isConverting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
                 }}
+                title="Convert to PDF for pixel-perfect preview with all watermarks & boxes"
               >
-                <Monitor size={14} />
-                {useOfficeEngine ? 'MS Office Viewer' : 'High-Res Preview'}
+                {isConverting ? (
+                  <><Loader2 size={14} className="animate-spin" /> Converting...</>
+                ) : (
+                  <><Monitor size={14} /> High-Res Preview</>
+                )}
               </button>
+            )}
+            {isDocx && effectivePdfUrl && (
+              <span style={{
+                fontSize: '12px', fontWeight: 700, color: '#22c55e',
+                backgroundColor: 'rgba(34,197,94,0.1)', padding: '4px 12px',
+                borderRadius: '99px', border: '1px solid rgba(34,197,94,0.2)',
+              }}>
+                ✓ PDF Preview Active
+              </span>
             )}
 
             {/* Zoom Controls */}
@@ -407,12 +461,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: isPdf ? 'stretch' : 'flex-start',
+          justifyContent: isShowingPdf ? 'stretch' : 'flex-start',
           backgroundColor: '#1e293b',
           position: 'relative',
         }}>
-          {isPdf && activeUrl ? (
-            /* Real Native PDF Viewer Embed */
+          {isShowingPdf ? (
+            /* Real Native PDF Viewer Embed — also used for converted DOCX→PDF with watermarks */
             <div style={{
               width: '100%',
               height: '100%',
@@ -426,7 +480,10 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               transition: 'transform 0.15s ease',
             }}>
               <iframe
-                src={activeUrl.startsWith('blob:') ? activeUrl : `${activeUrl}#toolbar=0&navpanes=0&scrollbar=1`}
+                src={(() => {
+                  const url = effectivePdfUrl || activeUrl;
+                  return url.startsWith('blob:') ? url : `${url}#toolbar=0&navpanes=0&scrollbar=1`;
+                })()}
                 title={activeFile.fileName}
                 style={{
                   width: '100%',
@@ -437,7 +494,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 }}
               />
             </div>
-          ) : isDocx && useOfficeEngine && isOnlineUrl ? (
+          ) : isShowingDocx ? (
             /* Microsoft Office Web Viewer for 100% Exact Word Rendering with Watermarks & Boxes */
             <div style={{
               width: '100%',

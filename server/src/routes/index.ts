@@ -9,6 +9,7 @@ import { uploadFile } from '../controllers/uploadController.js';
 import { calculatePriceHandler } from '../controllers/priceController.js';
 import { createPayment, verifyPayment } from '../controllers/paymentController.js';
 import { startPrint, getPrintStatus, cancelPrint } from '../controllers/printController.js';
+import { convertPreview } from '../controllers/convertPreviewController.js';
 import { authenticateMachine, getPendingJobs, downloadJobFile } from '../controllers/machineController.js';
 import { getAdminDashboard, getMachines, updateMachinePricing } from '../controllers/adminController.js';
 import { uploadMiddleware } from '../middleware/upload.js';
@@ -36,6 +37,9 @@ router.post('/verify-payment', verifyPayment);
 router.post('/print', startPrint);
 router.get('/print-status', getPrintStatus);
 router.post('/print/cancel', cancelPrint);
+
+// ── On-demand DOCX → PDF Preview Conversion ─────────────────
+router.post('/convert-preview', convertPreview);
 
 // ── Machine Kiosk APIs ──────────────────────────────────────
 router.post('/machine/auth', authenticateMachine);

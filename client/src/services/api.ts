@@ -119,4 +119,13 @@ export const apiService = {
   deleteSession: async (sessionId: string): Promise<void> => {
     await api.delete(`/sessions/${sessionId}`);
   },
+
+  /** On-demand DOCX/PPTX → PDF conversion for preview */
+  convertPreview: async (sessionId: string, fileId: string): Promise<{ pdfUrl: string | null; fallback?: boolean }> => {
+    const res = await api.post<ApiResponse<{ pdfUrl: string | null; fallback?: boolean }>>('/convert-preview', { sessionId, fileId });
+    if (!res.data.success || !res.data.data) {
+      throw new Error(res.data.error?.message || 'Conversion failed');
+    }
+    return res.data.data;
+  },
 };
