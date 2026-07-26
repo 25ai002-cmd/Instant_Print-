@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: instant-print-kiosk
+    env: node
+    region: singapore # Change to your preferred region (e.g. oregon, frankfurt, singapore)
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        value: file:./dev.db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PUBLIC_URL
+        sync: false # Set this to your Render URL e.g. https://instant-print-kiosk.onrender.com

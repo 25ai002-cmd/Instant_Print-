@@ -55,9 +55,17 @@ app.use((req, _res, next) => {
 // Routes
 app.use('/api', apiRoutes);
 
-// Health check endpoint
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', platform: 'Instant Print Cloud SaaS', time: new Date() });
+// Serve React Frontend static production bundle in production/cloud deployment
+const clientDistPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path === '/health') {
+    return next();
+  }
+  res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
+    if (err) next();
+  });
 });
 
 // Error handling
