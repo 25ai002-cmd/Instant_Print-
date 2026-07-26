@@ -1,0 +1,206 @@
+// ============================================================
+// PrintATM Cloud SaaS Platform — Prisma Database Schema
+// Scalable Relational Architecture for Multi-Machine Kiosks
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Uses SQLite locally; switch to "postgresql" for Render / Cloud deployment
+  url      = env("DATABASE_URL")
+}
+
+enum MachineStatusEnum {
+  ONLINE
+  OFFLINE
+  PRINTING
+  OUT_OF_PAPER
+  ERROR
+  MAINTENANCE
+}
+
+enum JobStatusEnum {
+  WAITING_UPLOAD
+  UPLOADED
+  PAYMENT_PENDING
+  PAYMENT_SUCCESS
+  ASSIGNED_TO_MACHINE
+  DOWNLOADING
+  PRINTING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentStatusEnum {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum AdminRoleEnum {
+  SUPER_ADMIN
+  OPERATOR
+  STORE_OWNER
+}
+
+model AdminUser {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  name         String
+  role         AdminRoleEnum @default(OPERATOR)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Machine {
+  id           String            @id @default(uuid())
+  machineCode  String            @unique // e.g. "ATM001", "ATM002"
+  name         String
+  locationName String            @default("Main Shop Kiosk")
+  authToken    String            @default(uuid()) // Secure machine API authentication token
+  status       MachineStatusEnum @default(OFFLINE)
+  isOnline     Boolean           @default(false)
+  lastHeartbeat DateTime?
+  printerModel String            @default("Brother DCP-L2531DW")
+  paperLevel   Int               @default(100) // Percentage 0-100
+  tonerLevel   Int               @default(100) // Percentage 0-100
+  
+  settings     MachineSettings?
+  pricing      Pricing?
+  printJobs    PrintJob[]
+  auditLogs    AuditLog[]
+  notifications Notification[]
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model MachineSettings {
+  id            String   @id @default(uuid())
+  machineId     String   @unique
+  machine       Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  
+  colorEnabled  Boolean  @default(true)
+  duplexEnabled Boolean  @default(true)
+  maxQueueSize  Int      @default(10)
+  autoResetSec  Int      @default(25)
+  paperSizes    String   @default("A4,A3,Letter,Legal")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Pricing {
+  id              String   @id @default(uuid())
+  machineId       String?  @unique
+  machine         Machine? @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  
+  bwSingleRate    Float    @default(2.0)  // ₹2 per page B&W single
+  bwDoubleRate    Float    @default(4.0)  // ₹4 per 2-sided sheet B&W
+  colorSingleRate Float    @default(10.0) // ₹10 per page Color single
+  colorDoubleRate Float    @default(16.0) // ₹16 per 2-sided sheet Color
+  a3Multiplier    Float    @default(2.0)
+  legalMultiplier Float    @default(1.2)
+  letterMultiplier Float   @default(1.1)
+  minimumCharge   Float    @default(2.0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PrintJob {
+  id            String        @id @default(uuid())
+  jobCode       String        @unique // Human readable code e.g. "JOB-8A95"
+  sessionId     String?       // Session ID linked to this job
+  machineId     String
+  machine       Machine       @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  
+  fileUrl       String        // Cloud file storage URL or server endpoint
+  fileName      String
+  fileSize      Int
+  mimeType      String        @default("application/pdf")
+  pageCount     Int
+  selectedPages Int           @default(1)
+  pageRanges    String?       // JSON string of page ranges e.g. '[{"from":1,"to":4}]'
+  
+  colorMode     String        @default("bw") // "bw" | "color"
+  sides         String        @default("single") // "single" | "double"
+  paperSize     String        @default("A4")
+  copies        Int           @default(1)
+  
+  totalPrice    Float
+  status        JobStatusEnum @default(WAITING_UPLOAD)
+  failureReason String?
+
+  payments      Payment[]
+  
+  createdAt     DateTime      @default(now())
+  completedAt   DateTime?
+  updatedAt     DateTime      @updatedAt
+}
+
+model SessionDocument {
+  id           String   @id @default(uuid())
+  sessionId    String
+  fileName     String
+  fileSize     Int
+  mimeType     String   @default("application/pdf")
+  filePath     String
+  pageCount    Int
+  colorPages   Int      @default(0)
+  bwPages      Int      @default(0)
+  orientation  String   @default("portrait")
+  paperSize    String   @default("A4")
+  isEstimate   Boolean  @default(false)
+  
+  createdAt    DateTime @default(now())
+}
+
+model Payment {
+  id                String            @id @default(uuid())
+  jobId             String
+  job               PrintJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  orderId           String            @unique
+  paymentId         String?
+  signature         String?
+  amount            Int               // Amount in paise (₹1 = 100 paise)
+  currency          String            @default("INR")
+  status            PaymentStatusEnum @default(PENDING)
+  provider          String            @default("RAZORPAY")
+  upiString         String?
+  
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  machineId String?
+  machine   Machine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  
+  action    String   // e.g. "JOB_SUBMITTED", "MACHINE_ONLINE", "PRINTER_ERROR"
+  actorType String   @default("SYSTEM") // "SYSTEM" | "CUSTOMER" | "MACHINE" | "ADMIN"
+  actorId   String?
+  details   String?  // JSON string
+  
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  machineId String?
+  machine   Machine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  
+  type      String   // "INFO" | "WARNING" | "ERROR"
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+}
