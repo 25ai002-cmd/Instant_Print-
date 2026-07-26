@@ -109,10 +109,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const activeFile = files[selectedFileIdx] || files[0];
   let activeUrl = objectUrls[selectedFileIdx] || activeFile?.previewUrl || activeFile?.url || '';
 
+  // Keep /uploads paths as relative URLs so Vite's proxy handles them.
+  // Only resolve to absolute if we have an explicit external VITE_API_URL env var.
   if (activeUrl && !activeUrl.startsWith('blob:') && !activeUrl.startsWith('http://') && !activeUrl.startsWith('https://')) {
-    const baseHost = (import.meta as any).env?.VITE_API_URL || (window.location.origin.includes('5173') ? 'http://localhost:3002' : window.location.origin);
-    const cleanedBase = baseHost.replace(/\/api\/?$/, '');
-    activeUrl = `${cleanedBase}${activeUrl.startsWith('/') ? '' : '/'}${activeUrl}`;
+    const externalApiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+    if (externalApiUrl) {
+      const cleanedBase = externalApiUrl.replace(/\/api\/?$/, '');
+      activeUrl = `${cleanedBase}${activeUrl.startsWith('/') ? '' : '/'}${activeUrl}`;
+    }
+    // else: leave as relative path (e.g. /uploads/...) — Vite proxy forwards to backend
   }
 
   const isImg = activeFile?.mimeType?.startsWith('image/') ||
@@ -124,13 +129,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const isOnlineUrl = activeUrl.startsWith('http://') || activeUrl.startsWith('https://');
 
-  // Effective URL — use converted PDF URL if available
+  // Effective URL — use converted PDF URL if available (keep as relative path for Vite proxy)
   const effectivePdfUrl = convertedPdfUrl
     ? (() => {
-        const base = (import.meta as any).env?.VITE_API_URL
-          ? ((import.meta as any).env.VITE_API_URL as string).replace(/\/api\/?$/, '')
-          : window.location.origin.includes('5173') ? 'http://localhost:3002' : window.location.origin;
-        return `${base}${convertedPdfUrl}`;
+        const externalBase = (import.meta as any).env?.VITE_API_URL as string | undefined;
+        if (externalBase) {
+          return `${externalBase.replace(/\/api\/?$/, '')}${convertedPdfUrl}`;
+        }
+        // Relative URL — Vite proxy handles /uploads routing
+        return convertedPdfUrl;
       })()
     : null;
 
