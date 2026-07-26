@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, Settings as SettingsIcon, Printer, FileText, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Settings as SettingsIcon, Printer, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { renderAsync } from 'docx-preview';
 import type { PrintSettings } from '../types/index.js';
 
 export interface PreviewFileItem {
@@ -34,6 +35,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 }) => {
   const [selectedFileIdx, setSelectedFileIdx] = useState<number>(initialFileIndex);
   const [objectUrls, setObjectUrls] = useState<Record<number, string>>({});
+  const [isDocxRendering, setIsDocxRendering] = useState<boolean>(false);
+  const docxContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isOpen || !files.length) return;
@@ -60,18 +63,40 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     };
   }, [isOpen, files, initialFileIndex]);
 
-  if (!isOpen || !files.length) return null;
-
   const activeFile = files[selectedFileIdx] || files[0];
   const activeUrl = objectUrls[selectedFileIdx] || activeFile?.previewUrl || activeFile?.url || '';
 
   const totalPages = files.reduce((sum, f) => sum + (f.pageCount || 1), 0);
   const isBwMode = settings.colorMode === 'bw';
 
-  const isImg = activeFile.mimeType?.startsWith('image/') ||
-    activeFile.fileName.match(/\.(png|jpe?g|webp|gif|bmp)$/i);
-  const isPdf = activeFile.mimeType === 'application/pdf' ||
-    activeFile.fileName.toLowerCase().endsWith('.pdf');
+  const isImg = activeFile?.mimeType?.startsWith('image/') ||
+    activeFile?.fileName?.match(/\.(png|jpe?g|webp|gif|bmp)$/i);
+  const isPdf = activeFile?.mimeType === 'application/pdf' ||
+    activeFile?.fileName?.toLowerCase().endsWith('.pdf');
+  const isDocx = activeFile?.mimeType?.includes('wordprocessingml') ||
+    activeFile?.fileName?.toLowerCase().endsWith('.docx');
+
+  // Render DOCX file natively using docx-preview
+  useEffect(() => {
+    if (isDocx && activeFile?.fileObj && docxContainerRef.current) {
+      setIsDocxRendering(true);
+      const targetContainer = docxContainerRef.current;
+      targetContainer.innerHTML = '';
+
+      activeFile.fileObj.arrayBuffer().then((buffer) => {
+        renderAsync(buffer, targetContainer, undefined, {
+          inWrapper: false,
+          ignoreWidth: false,
+          ignoreHeight: false,
+          className: 'docx-preview-sheet',
+        })
+          .catch((err) => console.warn('[DOCX Preview Warning]:', err))
+          .finally(() => setIsDocxRendering(false));
+      }).catch(() => setIsDocxRendering(false));
+    }
+  }, [selectedFileIdx, activeFile, isDocx]);
+
+  if (!isOpen || !files.length || !activeFile) return null;
 
   return (
     <div style={{
@@ -181,14 +206,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           </div>
         )}
 
-        {/* Main Document Viewer (Native PDF Viewer or Real Image Preview) */}
+        {/* Main Document Viewer (Native PDF, DOCX Preview, or Real Image Preview) */}
         <div style={{
           flex: 1,
           padding: '16px',
-          overflow: 'hidden',
+          overflowY: 'auto',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: isPdf ? 'stretch' : 'flex-start',
           backgroundColor: '#0f172a',
           position: 'relative',
         }}>
@@ -209,8 +235,47 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 style={{
                   width: '100%',
                   height: '100%',
+                  minHeight: '520px',
                   border: 'none',
                   backgroundColor: '#ffffff',
+                }}
+              />
+            </div>
+          ) : isDocx ? (
+            /* Real DOCX Word Document Rendered Preview */
+            <div style={{
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              position: 'relative',
+            }}>
+              {isDocxRendering && (
+                <div style={{
+                  padding: '24px',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                }}>
+                  <Loader2 className="animate-spin" size={20} color="#38bdf8" />
+                  Rendering Word Document Pages...
+                </div>
+              )}
+              <div
+                ref={docxContainerRef}
+                style={{
+                  width: '100%',
+                  maxWidth: '720px',
+                  backgroundColor: 'white',
+                  borderRadius: '6px',
+                  padding: '24px',
+                  boxShadow: '0 15px 35px rgba(0,0,0,0.5)',
+                  filter: isBwMode ? 'grayscale(100%)' : 'none',
+                  boxSizing: 'border-box',
+                  color: '#0f172a',
                 }}
               />
             </div>
@@ -240,7 +305,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               />
             </div>
           ) : (
-            /* General Office Document Preview Card */
+            /* Presentation Document Card Fallback */
             <div style={{
               width: '100%',
               maxWidth: '480px',
@@ -267,24 +332,6 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   <span style={{ fontSize: '12px', color: '#64748b' }}>
                     {activeFile.mimeType || 'Document'} • {activeFile.pageCount || 1} Page(s)
                   </span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, marginTop: '12px' }}>
-                <div style={{ height: '12px', backgroundColor: '#3b82f6', borderRadius: '3px', width: '80%' }} />
-                <div style={{ height: '8px', backgroundColor: '#94a3b8', borderRadius: '3px', width: '95%' }} />
-                <div style={{ height: '8px', backgroundColor: '#cbd5e1', borderRadius: '3px', width: '90%' }} />
-                <div style={{ height: '8px', backgroundColor: '#cbd5e1', borderRadius: '3px', width: '75%' }} />
-
-                <div style={{
-                  padding: '12px',
-                  backgroundColor: '#eff6ff',
-                  borderLeft: '4px solid #3b82f6',
-                  borderRadius: '4px',
-                  marginTop: '12px',
-                }}>
-                  <div style={{ height: '8px', backgroundColor: '#3b82f6', width: '60%', marginBottom: '6px' }} />
-                  <div style={{ height: '6px', backgroundColor: '#93c5fd', width: '85%' }} />
                 </div>
               </div>
             </div>
