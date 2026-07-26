@@ -12,7 +12,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { countPagesInRanges } from './priceService.js';
 import type { PrintJob, PrintJobStatus } from '../types/index.js';
 
-const execAsync = util.promisify(exec);
+const execAsync = (cmd: string) =>
+  new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    exec(cmd, { timeout: 1800000, maxBuffer: 500 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) reject(err);
+      else resolve({ stdout: stdout.toString(), stderr: stderr.toString() });
+    });
+  });
 
 /** Active print jobs tracked in memory */
 const jobs = new Map<string, PrintJob>();

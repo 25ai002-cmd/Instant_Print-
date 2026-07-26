@@ -108,9 +108,28 @@ async function analyzePdf(filePath: string): Promise<DocumentAnalysis> {
   };
 }
 
+import JSZip from 'jszip';
+
+async function getDocxExactPageCount(filePath: string): Promise<number | null> {
+  try {
+    const data = await fs.readFile(filePath);
+    const zip = await JSZip.loadAsync(data);
+    const appXml = await zip.file('docProps/app.xml')?.async('string');
+    if (appXml) {
+      const match = appXml.match(/<Pages>(\d+)<\/Pages>/i);
+      if (match && match[1]) {
+        const p = parseInt(match[1], 10);
+        if (p > 0) return p;
+      }
+    }
+  } catch (e) {
+    console.warn('[Docx Page Count Warning]:', e);
+  }
+  return null;
+}
+
 /**
- * Estimate page count for DOCX/PPTX by file size heuristic.
- * Average DOCX page: ~30KB. Average PPTX slide: ~100KB.
+ * Estimate or extract exact page count for DOCX/PPTX.
  */
 async function analyzeOfficeDoc(
   filePath: string,
@@ -119,9 +138,13 @@ async function analyzeOfficeDoc(
   const stats = await fs.stat(filePath);
   const sizeKb = stats.size / 1024;
 
-  let pageCount: number;
+  let pageCount: number | null = null;
+
   if (mimeType.includes('wordprocessingml')) {
-    pageCount = Math.max(1, Math.round(sizeKb / 30));
+    pageCount = await getDocxExactPageCount(filePath);
+    if (!pageCount) {
+      pageCount = Math.max(1, Math.round(sizeKb / 30));
+    }
   } else {
     // PPTX — each slide is a page
     pageCount = Math.max(1, Math.round(sizeKb / 100));
@@ -133,7 +156,7 @@ async function analyzeOfficeDoc(
     bwPages: Math.ceil(pageCount * 0.6),
     orientation: 'portrait',
     paperSize: 'A4',
-    isEstimate: true,
+    isEstimate: false,
   };
 }
 

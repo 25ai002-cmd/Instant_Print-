@@ -40,8 +40,8 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 // Serve temporary uploads directory statically
 const uploadsStaticPath = path.resolve(process.env.UPLOAD_DIR || './uploads');

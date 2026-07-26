@@ -3,9 +3,7 @@ import type { ApiResponse, PrintSession, PrintSettings } from '../types/index.js
 
 const api = axios.create({
   baseURL: '/api',
-  // NOTE: Do NOT set a global Content-Type here.
-  // FormData uploads need the browser to auto-set multipart/form-data with the
-  // correct boundary. A global JSON header would override that and break Multer.
+  timeout: 600000, // 10 minutes timeout for large 300-400 page document uploads
 });
 
 export const apiService = {

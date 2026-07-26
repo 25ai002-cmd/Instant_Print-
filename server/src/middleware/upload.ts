@@ -9,7 +9,7 @@ import path from 'path';
 import type { Request } from 'express';
 import { ALLOWED_MIME_TYPES, EXT_TO_MIME, ensureSessionDir } from '../services/fileService.js';
 
-const MAX_FILE_SIZE_MB = parseInt(process.env.MAX_FILE_SIZE_MB ?? '100', 10);
+const MAX_FILE_SIZE_MB = parseInt(process.env.MAX_FILE_SIZE_MB ?? '500', 10);
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 const storage = multer.diskStorage({
@@ -58,6 +58,6 @@ export const uploadMiddleware = multer({
   fileFilter,
   limits: {
     fileSize: MAX_FILE_SIZE_BYTES,
-    files: 10,
+    files: 50,
   },
 });
