@@ -11,7 +11,6 @@ import { prisma } from '../db/prisma.js';
 import { sessionService } from '../services/sessionService.js';
 import {
   analyzeDocument,
-  convertToPdf,
   deleteSessionFiles,
   validateFileMagicBytes,
 } from '../services/fileService.js';
@@ -80,26 +79,22 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Convert non-PDF files (DOCX, PPTX, PNG, JPG) to PDF internally
+    // Analyze document immediately (no slow conversion at upload time)
     try {
-      const effectivePath = await convertToPdf(file.path, file.mimetype);
-      const isConvertedPdf = effectivePath !== file.path;
-      const effectiveMime = isConvertedPdf ? 'application/pdf' : file.mimetype;
-
-      const analysis = await analyzeDocument(effectivePath, effectiveMime);
+      const analysis = await analyzeDocument(file.path, file.mimetype);
       const docItem = {
         id: crypto.randomUUID(),
-        filePath: effectivePath,
-        url: `/uploads/${sessionId}/${path.basename(effectivePath)}`,
+        filePath: file.path,
+        url: `/uploads/${sessionId}/${path.basename(file.path)}`,
         fileName: file.originalname,
         fileSize: file.size,
-        mimeType: effectiveMime,
+        mimeType: file.mimetype,
         pageCount: analysis.pageCount,
         colorPages: analysis.colorPages,
         bwPages: analysis.bwPages,
         orientation: analysis.orientation,
         paperSize: analysis.paperSize,
-        isEstimate: false,
+        isEstimate: analysis.isEstimate,
       };
 
       newUploadedFiles.push(docItem);

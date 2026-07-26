@@ -7,7 +7,7 @@
 import type { Request, Response } from 'express';
 import { sessionService } from '../services/sessionService.js';
 import { submitPrintJob, getJobStatus, cancelJob } from '../services/printerService.js';
-import { deleteSessionFiles } from '../services/fileService.js';
+import { convertToPdf, deleteSessionFiles } from '../services/fileService.js';
 import { prisma } from '../db/prisma.js';
 import type { ApiResponse } from '../types/index.js';
 
@@ -60,11 +60,13 @@ export async function startPrint(req: Request, res: Response): Promise<void> {
     : [{ filePath: session.filePath!, fileName: session.fileName ?? 'document', pageCount: session.analysis.pageCount }];
 
   try {
-    // Print each file sequentially
+    // Print each file sequentially, converting non-PDF to PDF at print time
     let lastPrintJob: any = null;
     for (const f of filesToPrint) {
+      // Convert non-PDF files (DOCX, PPTX, images) to PDF just before printing
+      const effectivePath = await convertToPdf(f.filePath, (f as any).mimeType ?? '');
       const printJob = await submitPrintJob({
-        filePath: f.filePath,
+        filePath: effectivePath,
         fileName: f.fileName,
         pageCount: f.pageCount,
         copies: session.settings.copies,
