@@ -227,480 +227,654 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const isBwMode = settings.colorMode === 'bw';
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.90)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 2000,
-      padding: '12px',
-    }}>
-      <div style={{
-        backgroundColor: '#0f172a',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '940px',
-        height: '94vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)',
-        overflow: 'hidden',
-        border: '1px solid #334155',
-      }}>
-        {/* Sleek Executive Header Bar */}
-        <div style={{
-          backgroundColor: '#0f172a',
-          color: 'white',
-          padding: '14px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #334155',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '8px',
-              backgroundColor: '#1e293b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid #475569',
-            }}>
-              {isImg ? <ImageIcon size={20} color="#38bdf8" /> : <FileText size={20} color="#38bdf8" />}
-            </div>
-            <div>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                margin: 0,
-                color: '#f8fafc',
-                fontFamily: 'var(--font-heading)',
-              }}>
-                {activeFile.fileName}
-              </h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
-                  Print Preview
-                </span>
-                <span style={{ color: '#475569' }}>•</span>
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#38bdf8',
-                  backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                  padding: '2px 8px',
-                  borderRadius: '99px',
-                  border: '1px solid rgba(56, 189, 248, 0.2)',
-                }}>
-                  {totalDocPages} Page{totalDocPages > 1 ? 's' : ''}
-                </span>
+    <>
+      {/* Inject responsive styles */}
+      <style>{`
+        .preview-modal-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background-color: rgba(15, 23, 42, 0.92);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 2000;
+          padding: 8px;
+        }
+
+        .preview-modal-box {
+          background-color: #0f172a;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 940px;
+          height: 96vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 60px -15px rgba(0,0,0,0.7);
+          overflow: hidden;
+          border: 1px solid #334155;
+        }
+
+        /* ── Header ── */
+        .preview-header {
+          background-color: #0f172a;
+          color: white;
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid #334155;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+
+        .preview-header-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+          flex: 1;
+        }
+
+        .preview-header-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          background-color: #1e293b;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #475569;
+          flex-shrink: 0;
+        }
+
+        .preview-header-title {
+          font-size: 15px;
+          font-weight: 700;
+          margin: 0;
+          color: #f8fafc;
+          font-family: var(--font-heading);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 180px;
+        }
+
+        .preview-header-meta {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 2px;
+          flex-wrap: wrap;
+        }
+
+        .preview-header-right {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+
+        .preview-zoom-group {
+          display: flex;
+          align-items: center;
+          background-color: #1e293b;
+          border-radius: 8px;
+          padding: 2px;
+          border: 1px solid #334155;
+        }
+
+        .preview-zoom-btn {
+          border: none;
+          background: none;
+          color: #cbd5e1;
+          padding: 5px;
+          cursor: pointer;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          touch-action: manipulation;
+        }
+
+        .preview-zoom-label {
+          font-size: 11px;
+          font-weight: 700;
+          color: #e2e8f0;
+          min-width: 36px;
+          text-align: center;
+        }
+
+        .preview-close-btn {
+          background: #1e293b;
+          color: #cbd5e1;
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border: 1px solid #334155;
+          transition: all 0.2s;
+          flex-shrink: 0;
+          touch-action: manipulation;
+        }
+
+        /* ── Tab bar ── */
+        .preview-tab-bar {
+          display: flex;
+          gap: 6px;
+          padding: 8px 14px;
+          background-color: #1e293b;
+          border-bottom: 1px solid #334155;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          flex-shrink: 0;
+        }
+
+        .preview-tab-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 12px;
+          border-radius: 8px;
+          border: 1px solid;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          touch-action: manipulation;
+        }
+
+        /* ── Canvas ── */
+        .preview-canvas {
+          flex: 1;
+          padding: 12px;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-start;
+          background-color: #1e293b;
+          position: relative;
+          min-height: 0;
+        }
+
+        .preview-canvas.pdf-mode {
+          padding: 0;
+        }
+
+        .preview-pdf-wrapper {
+          width: 100%;
+          height: 100%;
+          border-radius: 0;
+          overflow: hidden;
+          background-color: #ffffff;
+          box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+        }
+
+        .preview-iframe {
+          width: 100%;
+          height: 100%;
+          border: none;
+          background-color: #ffffff;
+          display: block;
+        }
+
+        /* ── Bottom dock ── */
+        .preview-dock {
+          background-color: #0f172a;
+          color: white;
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-top: 1px solid #334155;
+          gap: 12px;
+          flex-shrink: 0;
+          flex-wrap: wrap;
+        }
+
+        .preview-dock-info {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+          flex: 1;
+        }
+
+        .preview-dock-printer-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 10px;
+          background-color: #1e293b;
+          border: 1px solid #475569;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .preview-dock-printer-name {
+          font-size: 13px;
+          font-weight: 700;
+          color: #f8fafc;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .preview-dock-printer-sub {
+          font-size: 11px;
+          color: #94a3b8;
+          font-weight: 500;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .preview-confirm-btn {
+          background-color: #16a34a;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 11px 22px;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 4px 14px rgba(22, 163, 74, 0.4);
+          transition: all 0.2s;
+          white-space: nowrap;
+          flex-shrink: 0;
+          touch-action: manipulation;
+        }
+
+        .preview-highres-btn {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          border: 1px solid #334155;
+          padding: 5px 10px;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          touch-action: manipulation;
+        }
+
+        /* ── Mobile breakpoint ── */
+        @media (max-width: 480px) {
+          .preview-modal-overlay {
+            padding: 0;
+            align-items: flex-end;
+          }
+
+          .preview-modal-box {
+            height: 98vh;
+            border-radius: 20px 20px 0 0;
+            max-width: 100%;
+          }
+
+          .preview-header {
+            padding: 10px 12px;
+          }
+
+          .preview-header-title {
+            font-size: 13px;
+            max-width: 120px;
+          }
+
+          /* Hide zoom controls on very small screens to save space */
+          .preview-zoom-group {
+            display: none;
+          }
+
+          .preview-canvas {
+            padding: 0;
+          }
+
+          .preview-canvas.pdf-mode {
+            padding: 0;
+          }
+
+          .preview-pdf-wrapper {
+            border-radius: 0;
+          }
+
+          .preview-dock {
+            padding: 10px 12px;
+            gap: 8px;
+          }
+
+          .preview-dock-printer-name {
+            font-size: 12px;
+          }
+
+          .preview-dock-printer-sub {
+            font-size: 10px;
+          }
+
+          .preview-confirm-btn {
+            padding: 10px 18px;
+            font-size: 13px;
+          }
+
+          .preview-highres-btn {
+            font-size: 10px;
+            padding: 4px 8px;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .preview-header-title {
+            max-width: 90px;
+          }
+
+          .preview-header-icon {
+            display: none;
+          }
+        }
+      `}</style>
+
+      <div className="preview-modal-overlay">
+        <div className="preview-modal-box">
+          {/* Sleek Executive Header Bar */}
+          <div className="preview-header">
+            <div className="preview-header-left">
+              <div className="preview-header-icon">
+                {isImg ? <ImageIcon size={18} color="#38bdf8" /> : <FileText size={18} color="#38bdf8" />}
               </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* High-Res Preview: convert DOCX to PDF on server for 100% fidelity watermarks & boxes */}
-            {isDocx && !effectivePdfUrl && (
-              <button
-                onClick={convertAndPreview}
-                disabled={isConverting}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: isConverting ? '#334155' : '#1e293b',
-                  color: isConverting ? '#64748b' : '#38bdf8',
-                  border: '1px solid #334155',
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: isConverting ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                title="Convert to PDF for pixel-perfect preview with all watermarks & boxes"
-              >
-                {isConverting ? (
-                  <><Loader2 size={14} className="animate-spin" /> Converting...</>
-                ) : (
-                  <><Monitor size={14} /> High-Res Preview</>
-                )}
-              </button>
-            )}
-            {isDocx && effectivePdfUrl && (
-              <span style={{
-                fontSize: '12px', fontWeight: 700, color: '#22c55e',
-                backgroundColor: 'rgba(34,197,94,0.1)', padding: '4px 12px',
-                borderRadius: '99px', border: '1px solid rgba(34,197,94,0.2)',
-              }}>
-                ✓ PDF Preview Active
-              </span>
-            )}
-
-            {/* Zoom Controls */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: '#1e293b',
-              borderRadius: '8px',
-              padding: '2px',
-              border: '1px solid #334155',
-            }}>
-              <button
-                onClick={() => setZoomScale(Math.max(60, zoomScale - 10))}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  color: '#cbd5e1',
-                  padding: '6px',
-                  cursor: 'pointer',
-                  borderRadius: '4px',
-                }}
-                title="Zoom Out"
-              >
-                <ZoomOut size={16} />
-              </button>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#e2e8f0', minWidth: '42px', textAlign: 'center' }}>
-                {zoomScale}%
-              </span>
-              <button
-                onClick={() => setZoomScale(Math.min(150, zoomScale + 10))}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  color: '#cbd5e1',
-                  padding: '6px',
-                  cursor: 'pointer',
-                  borderRadius: '4px',
-                }}
-                title="Zoom In"
-              >
-                <ZoomIn size={16} />
-              </button>
-              {zoomScale !== 100 && (
-                <button
-                  onClick={() => setZoomScale(100)}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    color: '#94a3b8',
-                    padding: '6px',
-                    cursor: 'pointer',
-                  }}
-                  title="Reset Zoom"
-                >
-                  <RotateCcw size={14} />
-                </button>
-              )}
-            </div>
-
-            <button
-              onClick={onClose}
-              style={{
-                background: '#1e293b',
-                color: '#cbd5e1',
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                border: '1px solid #334155',
-                transition: 'all 0.2s',
-              }}
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-
-        {/* Multi-File Tab Bar if multiple files */}
-        {files.length > 1 && (
-          <div style={{
-            display: 'flex',
-            gap: '8px',
-            padding: '10px 20px',
-            backgroundColor: '#1e293b',
-            borderBottom: '1px solid #334155',
-            overflowX: 'auto',
-          }}>
-            {files.map((file, idx) => (
-              <button
-                key={idx}
-                onClick={() => setSelectedFileIdx(idx)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  border: '1px solid',
-                  borderColor: selectedFileIdx === idx ? '#38bdf8' : '#334155',
-                  backgroundColor: selectedFileIdx === idx ? 'rgba(56, 189, 248, 0.15)' : '#0f172a',
-                  color: selectedFileIdx === idx ? '#38bdf8' : '#94a3b8',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {file.mimeType?.startsWith('image/') ? <ImageIcon size={14} /> : <FileText size={14} />}
-                {file.fileName}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Main Document Scroll Canvas */}
-        <div style={{
-          flex: 1,
-          padding: '24px',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: isShowingPdf ? 'stretch' : 'flex-start',
-          backgroundColor: '#1e293b',
-          position: 'relative',
-        }}>
-          {isShowingPdf ? (
-            /* Real Native PDF Viewer Embed — also used for converted DOCX→PDF with watermarks */
-            <div style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              backgroundColor: '#ffffff',
-              boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
-              filter: isBwMode ? 'grayscale(100%)' : 'none',
-              transform: `scale(${zoomScale / 100})`,
-              transformOrigin: 'top center',
-              transition: 'transform 0.15s ease',
-            }}>
-              <iframe
-                src={(() => {
-                  const url = effectivePdfUrl || activeUrl;
-                  return url.startsWith('blob:') ? url : `${url}#toolbar=0&navpanes=0&scrollbar=1`;
-                })()}
-                title={activeFile.fileName}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  minHeight: '560px',
-                  border: 'none',
-                  backgroundColor: '#ffffff',
-                }}
-              />
-            </div>
-          ) : isShowingDocx ? (
-            /* Microsoft Office Web Viewer for 100% Exact Word Rendering with Watermarks & Boxes */
-            <div style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              backgroundColor: '#ffffff',
-              boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
-              filter: isBwMode ? 'grayscale(100%)' : 'none',
-            }}>
-              <iframe
-                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activeUrl)}`}
-                title={activeFile.fileName}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  minHeight: '560px',
-                  border: 'none',
-                  backgroundColor: '#ffffff',
-                }}
-              />
-            </div>
-          ) : isDocx ? (
-            /* Real DOCX Word Document Rendered Pages (Headers, Footers, Watermarks & Boxes Enabled) */
-            <div style={{
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              position: 'relative',
-              transform: `scale(${zoomScale / 100})`,
-              transformOrigin: 'top center',
-              transition: 'transform 0.15s ease',
-            }}>
-              {isDocxRendering && (
-                <div style={{
-                  padding: '32px',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                }}>
-                  <Loader2 className="animate-spin" size={22} color="#38bdf8" />
-                  Rendering Word Document & Watermarks...
-                </div>
-              )}
-              <div
-                ref={docxContainerRef}
-                style={{
-                  width: '100%',
-                  maxWidth: '820px',
-                  filter: isBwMode ? 'grayscale(100%)' : 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-          ) : isImg && activeUrl ? (
-            /* Real Image Preview Sheet */
-            <div style={{
-              maxWidth: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'white',
-              borderRadius: '8px',
-              padding: '20px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-              filter: isBwMode ? 'grayscale(100%)' : 'none',
-              transform: `scale(${zoomScale / 100})`,
-              transformOrigin: 'top center',
-            }}>
-              <img
-                src={activeUrl}
-                alt={activeFile.fileName}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '75vh',
-                  objectFit: 'contain',
-                  borderRadius: '4px',
-                }}
-              />
-            </div>
-          ) : (
-            /* General Presentation Preview Card */
-            <div style={{
-              width: '100%',
-              maxWidth: '540px',
-              backgroundColor: 'white',
-              borderRadius: '8px',
-              padding: '32px',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-              filter: isBwMode ? 'grayscale(100%)' : 'none',
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
-                borderBottom: '2px solid #0f172a',
-                paddingBottom: '16px',
-                marginBottom: '20px',
-              }}>
-                <FileText size={32} color="#0066cc" />
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{activeFile.fileName}</h4>
-                  <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
-                    {activeFile.mimeType || 'Document'} • {totalDocPages} Page(s)
+              <div style={{ minWidth: 0 }}>
+                <h3 className="preview-header-title">{activeFile.fileName}</h3>
+                <div className="preview-header-meta">
+                  <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Preview</span>
+                  <span style={{ color: '#475569' }}>•</span>
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#38bdf8',
+                    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                    padding: '2px 7px',
+                    borderRadius: '99px',
+                    border: '1px solid rgba(56, 189, 248, 0.2)',
+                  }}>
+                    {totalDocPages}pg
                   </span>
                 </div>
               </div>
             </div>
+
+            <div className="preview-header-right">
+              {/* High-Res Preview button */}
+              {isDocx && !effectivePdfUrl && (
+                <button
+                  onClick={convertAndPreview}
+                  disabled={isConverting}
+                  className="preview-highres-btn"
+                  style={{
+                    backgroundColor: isConverting ? '#334155' : '#1e293b',
+                    color: isConverting ? '#64748b' : '#38bdf8',
+                  }}
+                  title="Convert to PDF for pixel-perfect preview"
+                >
+                  {isConverting ? (
+                    <><Loader2 size={12} className="animate-spin" />Converting</>
+                  ) : (
+                    <><Monitor size={12} />Hi-Res</>
+                  )}
+                </button>
+              )}
+              {isDocx && effectivePdfUrl && (
+                <span style={{
+                  fontSize: '10px', fontWeight: 700, color: '#22c55e',
+                  backgroundColor: 'rgba(34,197,94,0.1)', padding: '3px 8px',
+                  borderRadius: '99px', border: '1px solid rgba(34,197,94,0.2)',
+                }}>
+                  ✓ PDF
+                </span>
+              )}
+
+              {/* Zoom Controls */}
+              <div className="preview-zoom-group">
+                <button
+                  onClick={() => setZoomScale(Math.max(60, zoomScale - 10))}
+                  className="preview-zoom-btn"
+                  title="Zoom Out"
+                >
+                  <ZoomOut size={14} />
+                </button>
+                <span className="preview-zoom-label">{zoomScale}%</span>
+                <button
+                  onClick={() => setZoomScale(Math.min(150, zoomScale + 10))}
+                  className="preview-zoom-btn"
+                  title="Zoom In"
+                >
+                  <ZoomIn size={14} />
+                </button>
+                {zoomScale !== 100 && (
+                  <button
+                    onClick={() => setZoomScale(100)}
+                    className="preview-zoom-btn"
+                    title="Reset Zoom"
+                  >
+                    <RotateCcw size={12} />
+                  </button>
+                )}
+              </div>
+
+              <button onClick={onClose} className="preview-close-btn">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Multi-File Tab Bar if multiple files */}
+          {files.length > 1 && (
+            <div className="preview-tab-bar">
+              {files.map((file, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedFileIdx(idx)}
+                  className="preview-tab-btn"
+                  style={{
+                    borderColor: selectedFileIdx === idx ? '#38bdf8' : '#334155',
+                    backgroundColor: selectedFileIdx === idx ? 'rgba(56, 189, 248, 0.15)' : '#0f172a',
+                    color: selectedFileIdx === idx ? '#38bdf8' : '#94a3b8',
+                  }}
+                >
+                  {file.mimeType?.startsWith('image/') ? <ImageIcon size={12} /> : <FileText size={12} />}
+                  {file.fileName}
+                </button>
+              ))}
+            </div>
           )}
-        </div>
 
-        {/* Executive Bottom Dock (Printer Info + Sleek Confirm & Print Button) */}
-        <div style={{
-          backgroundColor: '#0f172a',
-          color: 'white',
-          padding: '16px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderTop: '1px solid #334155',
-          gap: '20px',
-        }}>
-          {/* Printer Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '10px',
-              backgroundColor: '#1e293b',
-              border: '1px solid #475569',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Printer size={22} color="#38bdf8" />
-            </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc' }}>
-                Brother DCP-L2531DW
-              </div>
-              <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>
-                Plain Paper, {settings.paperSize || 'A4'} • {settings.colorMode === 'bw' ? 'Black & White' : 'Color'} • {settings.sides === 'double' ? 'Double-Sided' : 'Single-Sided'}
-              </div>
-            </div>
-
-            {onOpenSettings && (
-              <button
-                onClick={onOpenSettings}
+          {/* Main Document Scroll Canvas */}
+          <div className={`preview-canvas${isShowingPdf ? ' pdf-mode' : ''}`}>
+            {isShowingPdf ? (
+              /* Real Native PDF Viewer Embed — also used for converted DOCX→PDF with watermarks */
+              <div
+                className="preview-pdf-wrapper"
                 style={{
-                  background: '#1e293b',
-                  color: '#94a3b8',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  cursor: 'pointer',
+                  filter: isBwMode ? 'grayscale(100%)' : 'none',
+                  transform: `scale(${zoomScale / 100})`,
+                  transformOrigin: 'top center',
+                  transition: 'transform 0.15s ease',
+                }}
+              >
+                <iframe
+                  src={(() => {
+                    const url = effectivePdfUrl || activeUrl;
+                    return url.startsWith('blob:') ? url : `${url}#toolbar=0&navpanes=0&scrollbar=1`;
+                  })()}
+                  title={activeFile.fileName}
+                  className="preview-iframe"
+                  style={{ minHeight: '100%' }}
+                />
+              </div>
+            ) : isShowingDocx ? (
+              /* Microsoft Office Web Viewer for 100% Exact Word Rendering */
+              <div
+                className="preview-pdf-wrapper"
+                style={{ filter: isBwMode ? 'grayscale(100%)' : 'none' }}
+              >
+                <iframe
+                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(activeUrl)}`}
+                  title={activeFile.fileName}
+                  className="preview-iframe"
+                  style={{ minHeight: '100%' }}
+                />
+              </div>
+            ) : isDocx ? (
+              /* Real DOCX Word Document Rendered Pages */
+              <div style={{
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                position: 'relative',
+                transform: `scale(${zoomScale / 100})`,
+                transformOrigin: 'top center',
+                transition: 'transform 0.15s ease',
+              }}>
+                {isDocxRendering && (
+                  <div style={{
+                    padding: '32px',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                  }}>
+                    <Loader2 className="animate-spin" size={20} color="#38bdf8" />
+                    Rendering Document...
+                  </div>
+                )}
+                <div
+                  ref={docxContainerRef}
+                  style={{
+                    width: '100%',
+                    maxWidth: '820px',
+                    filter: isBwMode ? 'grayscale(100%)' : 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            ) : isImg && activeUrl ? (
+              /* Real Image Preview Sheet */
+              <div style={{
+                maxWidth: '100%',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                padding: '16px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+                filter: isBwMode ? 'grayscale(100%)' : 'none',
+                transform: `scale(${zoomScale / 100})`,
+                transformOrigin: 'top center',
+              }}>
+                <img
+                  src={activeUrl}
+                  alt={activeFile.fileName}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: '4px',
+                  }}
+                />
+              </div>
+            ) : (
+              /* General Presentation Preview Card */
+              <div style={{
+                width: '100%',
+                maxWidth: '540px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+                filter: isBwMode ? 'grayscale(100%)' : 'none',
+              }}>
+                <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid #334155',
-                  marginLeft: '8px',
-                }}
-                title="Printer Settings"
-              >
-                <SettingsIcon size={18} />
-              </button>
+                  gap: '14px',
+                  borderBottom: '2px solid #0f172a',
+                  paddingBottom: '14px',
+                  marginBottom: '16px',
+                }}>
+                  <FileText size={28} color="#0066cc" />
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>{activeFile.fileName}</h4>
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+                      {activeFile.mimeType || 'Document'} • {totalDocPages} Page(s)
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Sleek High-Contrast Confirm & Print Button */}
-          <button
-            onClick={() => {
-              onClose();
-              if (onConfirmPrint) {
-                onConfirmPrint();
-              }
-            }}
-            style={{
-              backgroundColor: '#16a34a',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '12px 32px',
-              fontSize: '16px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)',
-              transition: 'all 0.2s',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            CONFIRM & PRINT
-          </button>
+          {/* Executive Bottom Dock */}
+          <div className="preview-dock">
+            {/* Printer Info */}
+            <div className="preview-dock-info">
+              <div className="preview-dock-printer-icon">
+                <Printer size={20} color="#38bdf8" />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div className="preview-dock-printer-name">Brother DCP-L2531DW</div>
+                <div className="preview-dock-printer-sub">
+                  {settings.paperSize || 'A4'} • {settings.colorMode === 'bw' ? 'B&W' : 'Color'} • {settings.sides === 'double' ? 'Duplex' : 'Single'}
+                </div>
+              </div>
+              {onOpenSettings && (
+                <button
+                  onClick={onOpenSettings}
+                  style={{
+                    background: '#1e293b',
+                    color: '#94a3b8',
+                    borderRadius: '8px',
+                    padding: '7px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid #334155',
+                    marginLeft: '4px',
+                    flexShrink: 0,
+                  }}
+                  title="Printer Settings"
+                >
+                  <SettingsIcon size={16} />
+                </button>
+              )}
+            </div>
+
+            {/* Confirm & Print Button */}
+            <button
+              onClick={() => {
+                onClose();
+                if (onConfirmPrint) {
+                  onConfirmPrint();
+                }
+              }}
+              className="preview-confirm-btn"
+            >
+              CONFIRM & PRINT
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
