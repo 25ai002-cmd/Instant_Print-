@@ -8,44 +8,77 @@ export const IdleScreen: React.FC = () => {
   const scannedAt = useSessionStore((state) => state.scannedAt);
   const [mobileUrl, setMobileUrl] = useState('');
   const [error, setError] = useState('');
+  const [customPublicUrl, setCustomPublicUrl] = useState<string>(
+    () => localStorage.getItem('kiosk_public_url') || ''
+  );
+  const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
+  const [configInput, setConfigInput] = useState<string>(customPublicUrl);
+
   // Guard so initializeSession is called ONLY ONCE, even in React StrictMode
   const initializedRef = useRef(false);
 
+  const startSession = async () => {
+    try {
+      const data = await initializeSession();
+
+      // Determine public cloud host URL so mobile phones on cellular data (4G/5G) can connect without LAN Wi-Fi
+      const storedPublicUrl = localStorage.getItem('kiosk_public_url');
+      const envPublicUrl = (import.meta as any).env?.VITE_PUBLIC_URL;
+      const serverPublicUrl = (data as any).publicUrl;
+      const isCloudOrigin = window.location.hostname !== 'localhost' && !window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/);
+
+      let host = storedPublicUrl || envPublicUrl || serverPublicUrl;
+
+      if (!host && isCloudOrigin) {
+        host = window.location.origin;
+      }
+
+      if (!host) {
+        const port = window.location.port || '80';
+        host = (data.localIp && data.localIp !== 'localhost')
+          ? `http://${data.localIp}:${port}`
+          : window.location.origin;
+      }
+
+      // Ensure protocol
+      if (host && !host.startsWith('http://') && !host.startsWith('https://')) {
+        host = `https://${host}`;
+      }
+
+      const url = `${host}/?session=${data.sessionId}&machine=ATM001`;
+      setMobileUrl(url);
+    } catch (err) {
+      console.error('Failed to initialize session for kiosk QR', err);
+      setError('Could not connect to printer. Retrying...');
+      initializedRef.current = false;
+      setTimeout(() => {
+        if (!initializedRef.current) {
+          initializedRef.current = true;
+          startSession();
+        }
+      }, 3000);
+    }
+  };
+
   useEffect(() => {
-    // If session already exists in the store (kiosk-side polling keeps it alive)
-    // or we already started initialization, skip
     if (initializedRef.current) return;
     initializedRef.current = true;
-
-    const startSession = async () => {
-      try {
-        const data = await initializeSession();
-        // Support remote mobile scan (4G/5G / external router) via configured Public URL or origin fallback
-        const port = window.location.port || '80';
-        let host = (data as any).publicUrl;
-        if (!host) {
-          host = (data.localIp && data.localIp !== 'localhost')
-            ? `http://${data.localIp}:${port}`
-            : window.location.origin;
-        }
-        const url = `${host}/?session=${data.sessionId}&machine=ATM001`;
-        setMobileUrl(url);
-      } catch (err) {
-        console.error('Failed to initialize session for kiosk QR', err);
-        setError('Could not connect to printer. Retrying...');
-        // Retry after 3 seconds
-        initializedRef.current = false;
-        setTimeout(() => {
-          if (!initializedRef.current) {
-            initializedRef.current = true;
-            startSession();
-          }
-        }, 3000);
-      }
-    };
-
     startSession();
-  }, []); // Empty deps — run only once on mount
+  }, []);
+
+  const handleSavePublicUrl = (urlToSave: string) => {
+    const trimmed = urlToSave.trim();
+    if (trimmed) {
+      localStorage.setItem('kiosk_public_url', trimmed);
+      setCustomPublicUrl(trimmed);
+    } else {
+      localStorage.removeItem('kiosk_public_url');
+      setCustomPublicUrl('');
+    }
+    setShowConfigModal(false);
+    initializedRef.current = false;
+    startSession();
+  };
 
   return (
     <div style={{
@@ -159,7 +192,6 @@ export const IdleScreen: React.FC = () => {
             {error}
           </div>
         ) : scannedAt ? (
-          // ── Phone connected — hide QR completely, show upload-prompt panel ──
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -262,13 +294,107 @@ export const IdleScreen: React.FC = () => {
 
         <div style={{
           marginTop: '28px',
-          fontSize: '13px',
-          color: 'var(--text-tertiary)',
-          fontWeight: 500,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
         }}>
-          Supports PDF, Word, PowerPoint &amp; Images
+          <span style={{ fontSize: '13px', color: 'var(--text-tertiary)', fontWeight: 500 }}>
+            Supports PDF, Word, PowerPoint &amp; Images
+          </span>
+
+          {/* Operator Public URL Config Trigger */}
+          <button
+            onClick={() => {
+              setConfigInput(customPublicUrl);
+              setShowConfigModal(true);
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-tertiary)',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              marginTop: '4px',
+              opacity: 0.7,
+            }}
+          >
+            ⚙️ {customPublicUrl ? `QR Target: ${customPublicUrl}` : 'Set Public Cloud URL (4G/5G Scans)'}
+          </button>
         </div>
       </div>
+
+      {/* Config Public URL Modal */}
+      {showConfigModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '16px',
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '440px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '6px' }}>
+              🌐 Configure Kiosk Public Cloud URL
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.4 }}>
+              Enter your public deployed Render URL or Tunnel domain (e.g. <code>https://instant-print-kiosk.onrender.com</code>) so mobile phones on cellular data (4G/5G) can scan and upload without needing to connect to the local Wi-Fi router.
+            </p>
+
+            <input
+              type="text"
+              value={configInput}
+              onChange={(e) => setConfigInput(e.target.value)}
+              placeholder="https://instant-print-kiosk.onrender.com"
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                border: '1.5px solid var(--border)',
+                fontSize: '14px',
+                marginBottom: '16px',
+                boxSizing: 'border-box',
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => setShowConfigModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'white',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSavePublicUrl(configInput)}
+                className="btn btn-primary"
+                style={{ padding: '8px 20px', fontSize: '13px' }}
+              >
+                Save &amp; Update QR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

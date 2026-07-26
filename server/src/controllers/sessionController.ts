@@ -31,6 +31,7 @@ function getLocalIpAddress(): string {
 export async function createSession(req: Request, res: Response): Promise<void> {
   const session = sessionService.create();
   const localIp = getLocalIpAddress();
+  const publicUrl = process.env.PUBLIC_URL || process.env.VITE_PUBLIC_URL || null;
 
   const response: ApiResponse = {
     success: true,
@@ -39,6 +40,7 @@ export async function createSession(req: Request, res: Response): Promise<void> 
       expiresAt: session.expiresAt,
       createdAt: session.createdAt,
       localIp,
+      publicUrl,
     },
   };
   res.status(201).json(response);
