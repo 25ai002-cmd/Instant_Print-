@@ -21,7 +21,7 @@ export const AnalysisScreen: React.FC = () => {
     cancelSession,
   } = useSessionStore();
 
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(true);
   const [previewFileIdx, setPreviewFileIdx] = useState(0);
 
   if (!analysis || !priceBreakdown) {
@@ -270,7 +270,8 @@ export const AnalysisScreen: React.FC = () => {
             mimeType: 'application/pdf',
             pageCount: analysis?.pageCount || 1,
           }]}
-          initialFileIndex={previewFileIdx}
+          onConfirmPrint={() => setScreen('payment')}
+          onOpenSettings={() => setScreen('settings')}
         />
       )}
     </div>
