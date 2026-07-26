@@ -28,13 +28,14 @@ export async function convertToPdf(filePath: string, mimeType: string): Promise<
     return filePath;
   }
 
-  const pdfPath = `${filePath}.pdf`;
+  const absoluteInputPath = path.resolve(filePath);
+  const pdfPath = `${absoluteInputPath}.pdf`;
 
   // 1. Convert Images (PNG, JPG, WEBP) -> PDF
   if (mimeType.startsWith('image/') || ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
     try {
       const pdfDoc = await PDFDocument.create();
-      const imageBytes = await fs.readFile(filePath);
+      const imageBytes = await fs.readFile(absoluteInputPath);
       let image;
       if (ext === '.png' || mimeType === 'image/png') {
         image = await pdfDoc.embedPng(imageBytes);
@@ -46,32 +47,50 @@ export async function convertToPdf(filePath: string, mimeType: string): Promise<
 
       const pdfBytes = await pdfDoc.save();
       await fs.writeFile(pdfPath, pdfBytes);
-      console.log(`[PDF Converter] Converted image ${filePath} -> ${pdfPath}`);
+      console.log(`[PDF Converter] Converted image ${absoluteInputPath} -> ${pdfPath}`);
       return pdfPath;
     } catch (err) {
       console.warn('[PDF Converter] Image to PDF conversion warning:', err);
-      return filePath;
+      return absoluteInputPath;
     }
   }
 
   // 2. Convert Office Docs (.docx, .pptx) -> PDF
   if (mimeType.includes('officedocument') || ['.docx', '.pptx', '.doc', '.ppt'].includes(ext)) {
+    // Primary on Windows: Try PowerShell Microsoft Word COM automation
+    if (process.platform === 'win32') {
+      try {
+        const escapedPath = absoluteInputPath.replace(/'/g, "''");
+        const escapedPdf = pdfPath.replace(/'/g, "''");
+        const psCmd = `powershell -Command "$word = New-Object -ComObject Word.Application; $word.Visible = $false; $doc = $word.Documents.Open('${escapedPath}'); $doc.SaveAs([ref]'${escapedPdf}', [ref]17); $doc.Close(); $word.Quit()"`;
+        console.log(`[PDF Converter] Windows Word COM converting ${absoluteInputPath} -> ${pdfPath}...`);
+        await execAsync(psCmd);
+        const exists = await fs.stat(pdfPath).then(() => true).catch(() => false);
+        if (exists) {
+          console.log(`[PDF Converter] Windows Word COM conversion successful: ${pdfPath}`);
+          return pdfPath;
+        }
+      } catch (winErr) {
+        console.warn('[PDF Converter] Windows Word COM conversion fallback:', winErr);
+      }
+    }
+
+    // Secondary: libreoffice-convert buffer conversion
     try {
-      // Primary: libreoffice-convert buffer conversion
-      const docBuffer = await fs.readFile(filePath);
+      const docBuffer = await fs.readFile(absoluteInputPath);
       const pdfBuffer = await libreConvert(docBuffer, '.pdf', undefined);
       await fs.writeFile(pdfPath, pdfBuffer);
-      console.log(`[PDF Converter] Converted office doc ${filePath} -> ${pdfPath}`);
+      console.log(`[PDF Converter] Converted office doc ${absoluteInputPath} -> ${pdfPath}`);
       return pdfPath;
     } catch (libreErr) {
       console.warn('[PDF Converter] libreoffice-convert buffer failed, trying CLI...', libreErr);
       try {
-        const outDir = path.dirname(filePath);
-        await execAsync(`libreoffice --headless --convert-to pdf --outdir "${outDir}" "${filePath}"`);
-        const generatedPdf = filePath.replace(/\.[^/.]+$/, '.pdf');
+        const outDir = path.dirname(absoluteInputPath);
+        await execAsync(`libreoffice --headless --convert-to pdf --outdir "${outDir}" "${absoluteInputPath}"`);
+        const generatedPdf = absoluteInputPath.replace(/\.[^/.]+$/, '.pdf');
         const exists = await fs.stat(generatedPdf).then(() => true).catch(() => false);
         if (exists) {
-          console.log(`[PDF Converter] Converted CLI office doc ${filePath} -> ${generatedPdf}`);
+          console.log(`[PDF Converter] Converted CLI office doc ${absoluteInputPath} -> ${generatedPdf}`);
           return generatedPdf;
         }
       } catch (cliErr) {
@@ -80,7 +99,7 @@ export async function convertToPdf(filePath: string, mimeType: string): Promise<
     }
   }
 
-  return filePath;
+  return absoluteInputPath;
 }
 
 /** Map extensions to canonical MIME types */
