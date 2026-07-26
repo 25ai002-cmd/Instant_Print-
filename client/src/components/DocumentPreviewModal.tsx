@@ -24,6 +24,40 @@ interface DocumentPreviewModalProps {
   onOpenSettings?: () => void;
 }
 
+/**
+ * Fast client-side PDF page counter directly from PDF binary buffer
+ */
+async function getPdfPageCount(file: File | Blob | string): Promise<number | null> {
+  try {
+    let buffer: ArrayBuffer;
+    if (typeof file === 'string') {
+      const res = await fetch(file);
+      buffer = await res.arrayBuffer();
+    } else {
+      buffer = await file.arrayBuffer();
+    }
+    const text = new TextDecoder('latin1').decode(new Uint8Array(buffer));
+
+    // 1. Search for /Count N in PDF catalog
+    const countMatches = Array.from(text.matchAll(/\/Count\s+(\d+)/g));
+    if (countMatches.length > 0) {
+      const counts = countMatches.map((m) => parseInt(m[1], 10)).filter((n) => !isNaN(n) && n > 0);
+      if (counts.length > 0) {
+        return Math.max(...counts);
+      }
+    }
+
+    // 2. Fallback: count /Type /Page objects
+    const pageMatches = text.match(/\/Type\s*\/Page\b/g);
+    if (pageMatches && pageMatches.length > 0) {
+      return pageMatches.length;
+    }
+  } catch (e) {
+    console.warn('[PDF Page Counter Note]:', e);
+  }
+  return null;
+}
+
 export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   isOpen,
   onClose,
@@ -37,6 +71,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [objectUrls, setObjectUrls] = useState<Record<number, string>>({});
   const [isDocxRendering, setIsDocxRendering] = useState<boolean>(false);
   const [renderedDocxPages, setRenderedDocxPages] = useState<number | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState<number | null>(null);
   const [useOfficeEngine, setUseOfficeEngine] = useState<boolean>(false);
   const [zoomScale, setZoomScale] = useState<number>(100);
   const docxContainerRef = useRef<HTMLDivElement>(null);
@@ -70,7 +105,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   let activeUrl = objectUrls[selectedFileIdx] || activeFile?.previewUrl || activeFile?.url || '';
 
   if (activeUrl && !activeUrl.startsWith('blob:') && !activeUrl.startsWith('http://') && !activeUrl.startsWith('https://')) {
-    const baseHost = (import.meta as any).env?.VITE_API_URL || window.location.origin;
+    const baseHost = (import.meta as any).env?.VITE_API_URL || (window.location.origin.includes('5173') ? 'http://localhost:3002' : window.location.origin);
     const cleanedBase = baseHost.replace(/\/api\/?$/, '');
     activeUrl = `${cleanedBase}${activeUrl.startsWith('/') ? '' : '/'}${activeUrl}`;
   }
@@ -84,8 +119,19 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const isOnlineUrl = activeUrl.startsWith('http://') || activeUrl.startsWith('https://');
 
-  const totalDocPages = renderedDocxPages || activeFile?.pageCount || 1;
-  const isBwMode = settings.colorMode === 'bw';
+  // Extract PDF page count on client
+  useEffect(() => {
+    if (isPdf && (activeFile?.fileObj || activeUrl)) {
+      const target = activeFile.fileObj || activeUrl;
+      getPdfPageCount(target).then((count) => {
+        if (count && count > 0) {
+          setPdfPageCount(count);
+        }
+      });
+    } else {
+      setPdfPageCount(null);
+    }
+  }, [selectedFileIdx, activeFile, activeUrl, isPdf]);
 
   // Render DOCX file with headers, footers, watermarks, shapes & borders enabled
   useEffect(() => {
@@ -120,6 +166,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   }, [selectedFileIdx, activeFile, isDocx, useOfficeEngine]);
 
   if (!isOpen || !files.length || !activeFile) return null;
+
+  const totalDocPages = pdfPageCount || renderedDocxPages || activeFile?.pageCount || 1;
+  const isBwMode = settings.colorMode === 'bw';
 
   return (
     <div style={{
@@ -367,7 +416,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               transition: 'transform 0.15s ease',
             }}>
               <iframe
-                src={`${activeUrl}#toolbar=0&navpanes=0&scrollbar=1`}
+                src={activeUrl.startsWith('blob:') ? activeUrl : `${activeUrl}#toolbar=0&navpanes=0&scrollbar=1`}
                 title={activeFile.fileName}
                 style={{
                   width: '100%',
