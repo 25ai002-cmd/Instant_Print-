@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Settings as SettingsIcon, Printer, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { X, Settings as SettingsIcon, Printer, FileText, Image as ImageIcon, Loader2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { renderAsync } from 'docx-preview';
 import type { PrintSettings } from '../types/index.js';
 
@@ -36,6 +36,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const [selectedFileIdx, setSelectedFileIdx] = useState<number>(initialFileIndex);
   const [objectUrls, setObjectUrls] = useState<Record<number, string>>({});
   const [isDocxRendering, setIsDocxRendering] = useState<boolean>(false);
+  const [zoomScale, setZoomScale] = useState<number>(100);
   const docxContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,7 +73,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     activeUrl = `${cleanedBase}${activeUrl.startsWith('/') ? '' : '/'}${activeUrl}`;
   }
 
-  const totalPages = files.reduce((sum, f) => sum + (f.pageCount || 1), 0);
+  const totalDocPages = activeFile?.pageCount || 1;
   const isBwMode = settings.colorMode === 'bw';
 
   const isImg = activeFile?.mimeType?.startsWith('image/') ||
@@ -82,7 +83,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const isDocx = activeFile?.mimeType?.includes('wordprocessingml') ||
     activeFile?.fileName?.toLowerCase().endsWith('.docx');
 
-  // Render DOCX file natively using docx-preview
+  // Render DOCX file natively using docx-preview for all pages
   useEffect(() => {
     if (isDocx && activeFile?.fileObj && docxContainerRef.current) {
       setIsDocxRendering(true);
@@ -91,10 +92,10 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
       activeFile.fileObj.arrayBuffer().then((buffer) => {
         renderAsync(buffer, targetContainer, undefined, {
-          inWrapper: false,
+          inWrapper: true,
           ignoreWidth: false,
           ignoreHeight: false,
-          className: 'docx-preview-sheet',
+          className: 'docx-preview-sheet-wrapper',
         })
           .catch((err) => console.warn('[DOCX Preview Warning]:', err))
           .finally(() => setIsDocxRendering(false));
@@ -111,8 +112,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.85)',
-      backdropFilter: 'blur(6px)',
+      backgroundColor: 'rgba(15, 23, 42, 0.90)',
+      backdropFilter: 'blur(8px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -120,59 +121,147 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       padding: '12px',
     }}>
       <div style={{
-        backgroundColor: '#f1f5f9',
+        backgroundColor: '#0f172a',
         borderRadius: '16px',
         width: '100%',
-        maxWidth: '850px',
-        height: '92vh',
+        maxWidth: '920px',
+        height: '94vh',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.7)',
         overflow: 'hidden',
-        border: '1px solid #cbd5e1',
+        border: '1px solid #334155',
       }}>
-        {/* Top Header Bar (Blue theme) */}
+        {/* Sleek Executive Header Bar */}
         <div style={{
-          backgroundColor: '#3b82f6',
+          backgroundColor: '#0f172a',
           color: 'white',
-          padding: '14px 20px',
+          padding: '16px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          borderBottom: '1px solid #334155',
         }}>
-          <div>
-            <h3 style={{
-              fontSize: '20px',
-              fontWeight: 800,
-              margin: 0,
-              fontFamily: 'var(--font-heading)',
-              color: 'white',
-            }}>
-              Print Preview
-            </h3>
-            <span style={{ fontSize: '13px', opacity: 0.9, fontWeight: 600 }}>
-              {activeFile.fileName} ({totalPages} Page{totalPages > 1 ? 's' : ''})
-            </span>
-          </div>
-
-          <button
-            onClick={onClose}
-            style={{
-              border: 'none',
-              background: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '8px',
+              backgroundColor: '#1e293b',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-          >
-            <X size={20} />
-          </button>
+              border: '1px solid #475569',
+            }}>
+              {isImg ? <ImageIcon size={20} color="#38bdf8" /> : <FileText size={20} color="#38bdf8" />}
+            </div>
+            <div>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                margin: 0,
+                color: '#f8fafc',
+                fontFamily: 'var(--font-heading)',
+              }}>
+                {activeFile.fileName}
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
+                  Print Preview
+                </span>
+                <span style={{ color: '#475569' }}>•</span>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#38bdf8',
+                  backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                  padding: '2px 8px',
+                  borderRadius: '99px',
+                  border: '1px solid rgba(56, 189, 248, 0.2)',
+                }}>
+                  {totalDocPages} Page{totalDocPages > 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Zoom Controls */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: '#1e293b',
+              borderRadius: '8px',
+              padding: '2px',
+              border: '1px solid #334155',
+            }}>
+              <button
+                onClick={() => setZoomScale(Math.max(60, zoomScale - 10))}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: '#cbd5e1',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  borderRadius: '4px',
+                }}
+                title="Zoom Out"
+              >
+                <ZoomOut size={16} />
+              </button>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#e2e8f0', minWidth: '42px', textAlign: 'center' }}>
+                {zoomScale}%
+              </span>
+              <button
+                onClick={() => setZoomScale(Math.min(150, zoomScale + 10))}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: '#cbd5e1',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  borderRadius: '4px',
+                }}
+                title="Zoom In"
+              >
+                <ZoomIn size={16} />
+              </button>
+              {zoomScale !== 100 && (
+                <button
+                  onClick={() => setZoomScale(100)}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    color: '#94a3b8',
+                    padding: '6px',
+                    cursor: 'pointer',
+                  }}
+                  title="Reset Zoom"
+                >
+                  <RotateCcw size={14} />
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={onClose}
+              style={{
+                background: '#1e293b',
+                color: '#cbd5e1',
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                border: '1px solid #334155',
+                transition: 'all 0.2s',
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Multi-File Tab Bar if multiple files */}
@@ -180,9 +269,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           <div style={{
             display: 'flex',
             gap: '8px',
-            padding: '8px 16px',
-            backgroundColor: '#e2e8f0',
-            borderBottom: '1px solid #cbd5e1',
+            padding: '10px 20px',
+            backgroundColor: '#1e293b',
+            borderBottom: '1px solid #334155',
             overflowX: 'auto',
           }}>
             {files.map((file, idx) => (
@@ -192,15 +281,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '8px',
                   padding: '6px 14px',
-                  borderRadius: '99px',
+                  borderRadius: '8px',
                   border: '1px solid',
-                  borderColor: selectedFileIdx === idx ? '#3b82f6' : '#cbd5e1',
-                  backgroundColor: selectedFileIdx === idx ? '#3b82f6' : 'white',
-                  color: selectedFileIdx === idx ? 'white' : '#475569',
+                  borderColor: selectedFileIdx === idx ? '#38bdf8' : '#334155',
+                  backgroundColor: selectedFileIdx === idx ? 'rgba(56, 189, 248, 0.15)' : '#0f172a',
+                  color: selectedFileIdx === idx ? '#38bdf8' : '#94a3b8',
                   fontSize: '12px',
-                  fontWeight: 700,
+                  fontWeight: 600,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                 }}
@@ -212,16 +301,16 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           </div>
         )}
 
-        {/* Main Document Viewer (Native PDF, DOCX Preview, or Real Image Preview) */}
+        {/* Main Document Scroll Canvas */}
         <div style={{
           flex: 1,
-          padding: '16px',
+          padding: '24px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: isPdf ? 'stretch' : 'flex-start',
-          backgroundColor: '#0f172a',
+          backgroundColor: '#1e293b',
           position: 'relative',
         }}>
           {isPdf && activeUrl ? (
@@ -232,8 +321,11 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               borderRadius: '8px',
               overflow: 'hidden',
               backgroundColor: '#ffffff',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
               filter: isBwMode ? 'grayscale(100%)' : 'none',
+              transform: `scale(${zoomScale / 100})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.15s ease',
             }}>
               <iframe
                 src={`${activeUrl}#toolbar=0&navpanes=0&scrollbar=1`}
@@ -241,47 +333,45 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 style={{
                   width: '100%',
                   height: '100%',
-                  minHeight: '520px',
+                  minHeight: '560px',
                   border: 'none',
                   backgroundColor: '#ffffff',
                 }}
               />
             </div>
           ) : isDocx ? (
-            /* Real DOCX Word Document Rendered Preview */
+            /* Real DOCX Word Document Rendered Pages (All Pages Continuous Scroll) */
             <div style={{
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               position: 'relative',
+              transform: `scale(${zoomScale / 100})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.15s ease',
             }}>
               {isDocxRendering && (
                 <div style={{
-                  padding: '24px',
+                  padding: '32px',
                   color: 'white',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: '10px',
                   fontSize: '14px',
                   fontWeight: 600,
                 }}>
-                  <Loader2 className="animate-spin" size={20} color="#38bdf8" />
-                  Rendering Word Document Pages...
+                  <Loader2 className="animate-spin" size={22} color="#38bdf8" />
+                  Rendering {totalDocPages > 1 ? `${totalDocPages} Word Document Pages...` : 'Word Document...'}
                 </div>
               )}
               <div
                 ref={docxContainerRef}
                 style={{
                   width: '100%',
-                  maxWidth: '720px',
-                  backgroundColor: 'white',
-                  borderRadius: '6px',
-                  padding: '24px',
-                  boxShadow: '0 15px 35px rgba(0,0,0,0.5)',
+                  maxWidth: '800px',
                   filter: isBwMode ? 'grayscale(100%)' : 'none',
                   boxSizing: 'border-box',
-                  color: '#0f172a',
                 }}
               />
             </div>
@@ -289,54 +379,54 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             /* Real Image Preview Sheet */
             <div style={{
               maxWidth: '100%',
-              maxHeight: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: 'white',
               borderRadius: '8px',
-              padding: '16px',
-              boxShadow: '0 15px 35px rgba(0,0,0,0.5)',
+              padding: '20px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
               filter: isBwMode ? 'grayscale(100%)' : 'none',
+              transform: `scale(${zoomScale / 100})`,
+              transformOrigin: 'top center',
             }}>
               <img
                 src={activeUrl}
                 alt={activeFile.fileName}
                 style={{
                   maxWidth: '100%',
-                  maxHeight: '70vh',
+                  maxHeight: '75vh',
                   objectFit: 'contain',
                   borderRadius: '4px',
                 }}
               />
             </div>
           ) : (
-            /* Presentation Document Card Fallback */
+            /* General Office Presentation Preview Card */
             <div style={{
               width: '100%',
-              maxWidth: '480px',
-              height: '80%',
+              maxWidth: '540px',
               backgroundColor: 'white',
               borderRadius: '8px',
-              padding: '24px',
+              padding: '32px',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 15px 35px rgba(0,0,0,0.5)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
               filter: isBwMode ? 'grayscale(100%)' : 'none',
             }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
+                gap: '16px',
                 borderBottom: '2px solid #0f172a',
-                paddingBottom: '12px',
-                marginBottom: '16px',
+                paddingBottom: '16px',
+                marginBottom: '20px',
               }}>
-                <FileText size={28} color="#3b82f6" />
+                <FileText size={32} color="#0066cc" />
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 800 }}>{activeFile.fileName}</h4>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>
-                    {activeFile.mimeType || 'Document'} • {activeFile.pageCount || 1} Page(s)
+                  <h4 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{activeFile.fileName}</h4>
+                  <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
+                    {activeFile.mimeType || 'Document'} • {totalDocPages} Page(s)
                   </span>
                 </div>
               </div>
@@ -344,40 +434,37 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           )}
         </div>
 
-        {/* Bottom Bar (Printer Status + Big Green PRINT Button) */}
+        {/* Executive Bottom Dock (Printer Info + Sleek Confirm & Print Button) */}
         <div style={{
-          backgroundColor: '#2563eb',
+          backgroundColor: '#0f172a',
           color: 'white',
-          padding: '16px 20px',
+          padding: '16px 24px',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '14px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderTop: '1px solid #334155',
+          gap: '20px',
         }}>
-          {/* Printer Info Row */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Printer size={22} color="white" />
+          {/* Printer Info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              backgroundColor: '#1e293b',
+              border: '1px solid #475569',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Printer size={22} color="#38bdf8" />
+            </div>
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc' }}>
+                Brother DCP-L2531DW
               </div>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: 'white' }}>
-                  DCP-L2531DW series
-                </div>
-                <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                  Plain Paper, {settings.paperSize || 'A4'} • {settings.colorMode === 'bw' ? 'Black & White' : 'Color'} • {settings.sides === 'double' ? 'Double-Sided' : 'Single-Sided'}
-                </div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>
+                Plain Paper, {settings.paperSize || 'A4'} • {settings.colorMode === 'bw' ? 'Black & White' : 'Color'} • {settings.sides === 'double' ? 'Double-Sided' : 'Single-Sided'}
               </div>
             </div>
 
@@ -385,23 +472,25 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               <button
                 onClick={onOpenSettings}
                 style={{
-                  border: 'none',
-                  background: 'none',
-                  color: 'white',
+                  background: '#1e293b',
+                  color: '#94a3b8',
+                  borderRadius: '8px',
+                  padding: '8px',
                   cursor: 'pointer',
-                  padding: '6px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  border: '1px solid #334155',
+                  marginLeft: '8px',
                 }}
                 title="Printer Settings"
               >
-                <SettingsIcon size={24} />
+                <SettingsIcon size={18} />
               </button>
             )}
           </div>
 
-          {/* Prominent Green PRINT Button */}
+          {/* Sleek High-Contrast Confirm & Print Button */}
           <button
             onClick={() => {
               onClose();
@@ -410,21 +499,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               }
             }}
             style={{
-              backgroundColor: '#22c55e',
+              backgroundColor: '#16a34a',
               color: 'white',
               border: 'none',
               borderRadius: '10px',
-              padding: '14px',
-              fontSize: '18px',
-              fontWeight: 800,
-              letterSpacing: '1px',
+              padding: '12px 32px',
+              fontSize: '16px',
+              fontWeight: 700,
               cursor: 'pointer',
-              width: '100%',
-              boxShadow: '0 4px 14px rgba(34, 197, 94, 0.4)',
-              transition: 'transform 0.1s, background-color 0.2s',
+              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
             }}
           >
-            PRINT
+            CONFIRM & PRINT
           </button>
         </div>
       </div>
