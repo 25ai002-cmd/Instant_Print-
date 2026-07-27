@@ -1,11 +1,9 @@
 services:
   - type: web
     name: instant-print-kiosk
-    env: node
+    env: docker
     region: singapore # Change to your preferred region (e.g. oregon, frankfurt, singapore)
     plan: free
-    buildCommand: npm run build
-    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production

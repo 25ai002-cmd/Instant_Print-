@@ -97,9 +97,76 @@ export async function convertToPdf(filePath: string, mimeType: string): Promise<
         console.warn('[PDF Converter] CLI libreoffice conversion unavailable:', cliErr);
       }
     }
+
+    // Tertiary: Fallback PDF builder from DOCX text using pdf-lib & JSZip
+    if (ext === '.docx' || mimeType.includes('wordprocessingml')) {
+      const fallbackPdf = await createFallbackPdfFromDocx(absoluteInputPath, pdfPath);
+      if (fallbackPdf && fallbackPdf !== absoluteInputPath) {
+        return fallbackPdf;
+      }
+    }
   }
 
   return absoluteInputPath;
+}
+
+/**
+ * Fallback PDF creator using JSZip text extraction and pdf-lib layout rendering
+ */
+async function createFallbackPdfFromDocx(inputPath: string, outputPath: string): Promise<string> {
+  try {
+    const data = await fs.readFile(inputPath);
+    const zip = await JSZip.loadAsync(data);
+    const docXml = await zip.file('word/document.xml')?.async('string');
+
+    let textLines: string[] = [];
+    if (docXml) {
+      const matches = docXml.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
+      if (matches) {
+        const fullText = matches.map((m) => m.replace(/<[^>]+>/g, '')).join(' ');
+        textLines = fullText.split(/(?<=[.!?])\s+|\n+/);
+      }
+    }
+
+    if (textLines.length === 0) {
+      textLines = ['[Document Content]'];
+    }
+
+    const pdfDoc = await PDFDocument.create();
+    let page = pdfDoc.addPage([595.28, 841.89]);
+    const { height } = page.getSize();
+    const margin = 50;
+    let y = height - margin;
+    const fontSize = 11;
+    const lineHeight = 16;
+
+    for (const line of textLines) {
+      const cleanLine = line.replace(/[^\x20-\x7E]/g, ' ').trim();
+      if (!cleanLine) continue;
+
+      for (let i = 0; i < cleanLine.length; i += 80) {
+        const chunk = cleanLine.substring(i, i + 80);
+        if (y < margin + fontSize) {
+          page = pdfDoc.addPage([595.28, 841.89]);
+          y = height - margin;
+        }
+        page.drawText(chunk, {
+          x: margin,
+          y,
+          size: fontSize,
+        });
+        y -= lineHeight;
+      }
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    await fs.writeFile(outputPath, pdfBytes);
+    console.log(`[PDF Converter] Created fallback PDF from DOCX: ${outputPath}`);
+    return outputPath;
+  } catch (err) {
+    console.warn('[PDF Converter] Fallback PDF generation warning:', err);
+    return inputPath;
+  }
 }
 
 /** Map extensions to canonical MIME types */
