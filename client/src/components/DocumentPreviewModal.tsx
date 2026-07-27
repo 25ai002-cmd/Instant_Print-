@@ -129,15 +129,17 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   const isOnlineUrl = activeUrl.startsWith('http://') || activeUrl.startsWith('https://');
 
+  const targetPdfUrl = convertedPdfUrl || (activeFile?.previewUrl?.toLowerCase().includes('.pdf') ? activeFile.previewUrl : null);
+
   // Effective URL — use converted PDF URL if available (keep as relative path for Vite proxy)
-  const effectivePdfUrl = convertedPdfUrl
+  const effectivePdfUrl = targetPdfUrl
     ? (() => {
         const externalBase = (import.meta as any).env?.VITE_API_URL as string | undefined;
         if (externalBase) {
-          return `${externalBase.replace(/\/api\/?$/, '')}${convertedPdfUrl}`;
+          return `${externalBase.replace(/\/api\/?$/, '')}${targetPdfUrl}`;
         }
         // Relative URL — Vite proxy handles /uploads routing
-        return convertedPdfUrl;
+        return targetPdfUrl;
       })()
     : null;
 
