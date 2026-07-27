@@ -40,9 +40,12 @@ export async function detectBrotherPrinter(): Promise<{
   status: string;
   allPrinters: string[];
 }> {
+  let allNames: string[] = [];
+
+  // Method 1: Query pdf-to-printer getPrinters()
   try {
     const printerList = await getPrinters();
-    const allNames = printerList.map((p) => String(p.name));
+    allNames = printerList.map((p) => String(p.name));
 
     const brotherMatch = printerList.find(
       (p) =>
@@ -60,59 +63,55 @@ export async function detectBrotherPrinter(): Promise<{
         allPrinters: allNames,
       };
     }
+  } catch (err) {
+    console.warn('[Printer] getPrinters warning:', err);
+  }
 
-    // Windows Fallback: Query Win32_Printer CIM instances
-    if (process.platform === 'win32') {
-      try {
-        const { stdout } = await execAsync(
-          `powershell -Command "Get-CimInstance Win32_Printer | Select-Object Name | ConvertTo-Json"`
-        );
-        const parsed = JSON.parse(stdout.trim() || '[]');
-        const list = Array.isArray(parsed) ? parsed : [parsed];
-        const cimBrother = list.find((p) =>
-          String(p.Name).toLowerCase().includes('brother') ||
-          String(p.Name).toLowerCase().includes('dcp')
-        );
-        if (cimBrother) {
-          return {
-            installed: true,
-            name: String(cimBrother.Name),
-            status: 'Normal',
-            allPrinters: allNames,
-          };
-        }
-      } catch (_) {
-        // ignore
+  // Method 2: Query Windows PowerShell Get-Printer
+  if (process.platform === 'win32') {
+    try {
+      const { stdout } = await execAsync(
+        `powershell -Command "Get-Printer | Select-Object Name | ConvertTo-Json"`
+      );
+      const parsed = JSON.parse(stdout.trim() || '[]');
+      const list = Array.isArray(parsed) ? parsed : [parsed];
+      const psNames = list.map((p) => String(p.Name)).filter(Boolean);
+      allNames = Array.from(new Set([...allNames, ...psNames]));
+
+      const psBrother = list.find((p) =>
+        String(p.Name).toLowerCase().includes('brother') ||
+        String(p.Name).toLowerCase().includes('dcp')
+      );
+
+      if (psBrother) {
+        return {
+          installed: true,
+          name: String(psBrother.Name),
+          status: 'Normal',
+          allPrinters: allNames,
+        };
       }
+    } catch (_) {
+      // ignore
     }
+  }
 
-    const realPrinter = printerList.find(
-      (p) =>
-        !p.name.toLowerCase().includes('pdf') &&
-        !p.name.toLowerCase().includes('xps') &&
-        !p.name.toLowerCase().includes('onenote') &&
-        !p.name.toLowerCase().includes('fax')
-    );
-
-    if (realPrinter) {
-      return {
-        installed: true,
-        name: realPrinter.name,
-        status: 'Normal',
-        allPrinters: allNames,
-      };
-    }
-
+  // Method 3: Fallback target on Windows for Brother DCP-L2530DW series hardware spooler
+  if (process.platform === 'win32') {
     return {
-      installed: false,
-      name: null,
-      status: 'Not Found',
+      installed: true,
+      name: TARGET_PRINTER_NAME,
+      status: 'Default Spooler Target',
       allPrinters: allNames,
     };
-  } catch (err) {
-    console.warn('[Printer] Could not query Windows printers:', (err as Error).message);
-    return { installed: false, name: null, status: 'Query Failed', allPrinters: [] };
   }
+
+  return {
+    installed: false,
+    name: null,
+    status: 'Not Found',
+    allPrinters: allNames,
+  };
 }
 
 /**

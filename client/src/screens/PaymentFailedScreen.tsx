@@ -1,9 +1,11 @@
 import React from 'react';
 import { useSessionStore } from '../store/sessionStore.ts';
-import { XCircle, RefreshCw, LogOut } from 'lucide-react';
+import { XCircle, RefreshCw, LogOut, Printer, ArrowLeft } from 'lucide-react';
 
 export const PaymentFailedScreen: React.FC = () => {
-  const { generatePayment, cancelSession, error } = useSessionStore();
+  const { generatePayment, triggerPrint, setScreen, cancelSession, error } = useSessionStore();
+
+  const isPrinterError = error?.toLowerCase().includes('printer') || error?.toLowerCase().includes('offline');
 
   return (
     <div style={{
@@ -18,15 +20,15 @@ export const PaymentFailedScreen: React.FC = () => {
       <div style={{
         width: '72px',
         height: '72px',
-        backgroundColor: 'var(--error-light)',
+        backgroundColor: isPrinterError ? '#fef3c7' : 'var(--error-light)',
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'var(--error)',
+        color: isPrinterError ? '#d97706' : 'var(--error)',
         marginBottom: '24px',
       }}>
-        <XCircle size={40} />
+        {isPrinterError ? <Printer size={40} /> : <XCircle size={40} />}
       </div>
 
       <h2 style={{
@@ -35,7 +37,7 @@ export const PaymentFailedScreen: React.FC = () => {
         marginBottom: '12px',
         fontFamily: 'var(--font-heading)',
       }}>
-        Payment Failed
+        {isPrinterError ? 'Printer Hardware Alert' : 'Payment Failed'}
       </h2>
 
       <p style={{
@@ -43,9 +45,9 @@ export const PaymentFailedScreen: React.FC = () => {
         color: 'var(--text-secondary)',
         lineHeight: 1.5,
         marginBottom: '32px',
-        maxWidth: '300px',
+        maxWidth: '320px',
       }}>
-        {error || 'The payment request timed out or was rejected by your bank. Please try again.'}
+        {error || 'The request could not be completed. Please try again.'}
       </p>
 
       <div style={{
@@ -55,19 +57,42 @@ export const PaymentFailedScreen: React.FC = () => {
         flexDirection: 'column',
         gap: '12px',
       }}>
-        <button
-          onClick={generatePayment}
-          className="btn btn-primary"
-        >
-          <RefreshCw size={18} /> Retry Payment
-        </button>
+        {isPrinterError ? (
+          <>
+            <button
+              onClick={() => {
+                setScreen('printing');
+                triggerPrint();
+              }}
+              className="btn btn-primary"
+            >
+              <RefreshCw size={18} /> Retry Printing
+            </button>
 
-        <button
-          onClick={cancelSession}
-          className="btn btn-secondary"
-        >
-          <LogOut size={18} /> Cancel & Exit
-        </button>
+            <button
+              onClick={() => setScreen('settings')}
+              className="btn btn-secondary"
+            >
+              <ArrowLeft size={18} /> Back to Print Settings
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={generatePayment}
+              className="btn btn-primary"
+            >
+              <RefreshCw size={18} /> Retry Payment
+            </button>
+
+            <button
+              onClick={cancelSession}
+              className="btn btn-secondary"
+            >
+              <LogOut size={18} /> Cancel &amp; Exit
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
