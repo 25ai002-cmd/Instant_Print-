@@ -80,23 +80,26 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Convert document to PDF immediately at upload time (like iLovePDF)
+    // Process document and generate PDF preview version
     try {
-      console.log(`[Upload] Converting "${file.originalname}" to PDF immediately...`);
+      console.log(`[Upload] Generating PDF preview for "${file.originalname}"...`);
       const effectivePdfPath = await convertToPdf(file.path, file.mimetype);
       const pdfFileName = path.basename(effectivePdfPath);
       const pdfUrl = `/uploads/${sessionId}/${pdfFileName}`;
+      const originalUrl = `/uploads/${sessionId}/${path.basename(file.path)}`;
 
       // Analyze the converted PDF document
       const analysis = await analyzeDocument(effectivePdfPath, 'application/pdf');
 
       const docItem: UploadedFile = {
         id: crypto.randomUUID(),
-        filePath: effectivePdfPath,
-        url: pdfUrl,
+        filePath: file.path,           // Preserve 100% original file path
+        pdfFilePath: effectivePdfPath, // Store converted PDF path for preview/print
+        url: originalUrl,              // Preserve 100% original file URL
+        previewUrl: pdfUrl,            // Converted PDF URL for preview
         fileName: file.originalname,
         fileSize: file.size,
-        mimeType: 'application/pdf',
+        mimeType: file.mimetype,       // Preserve 100% original MIME type (e.g. .docx)
         pageCount: analysis.pageCount,
         colorPages: analysis.colorPages,
         bwPages: analysis.bwPages,
@@ -115,8 +118,8 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
             sessionId,
             fileName: file.originalname,
             fileSize: file.size,
-            mimeType: 'application/pdf',
-            filePath: effectivePdfPath,
+            mimeType: file.mimetype,
+            filePath: file.path,
             pageCount: analysis.pageCount,
             colorPages: analysis.colorPages,
             bwPages: analysis.bwPages,
@@ -125,7 +128,7 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
             isEstimate: false,
           },
         });
-        console.log(`[Upload] Converted PDF document persisted to database: "${file.originalname}" -> ${pdfFileName} (Session: ${sessionId})`);
+        console.log(`[Upload] Document persisted to database: "${file.originalname}" (${file.mimetype}) -> PDF preview: ${pdfFileName}`);
       } catch (dbErr) {
         console.warn('[Upload] Database document log notice:', dbErr);
       }

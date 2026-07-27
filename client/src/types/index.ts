@@ -29,6 +29,7 @@ export interface DocumentAnalysis {
 export interface UploadedFile {
   id: string;
   filePath?: string;
+  pdfFilePath?: string;
   url?: string;
   previewUrl?: string;
   fileName: string;

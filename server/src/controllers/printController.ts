@@ -63,8 +63,8 @@ export async function startPrint(req: Request, res: Response): Promise<void> {
     // Print each file sequentially, converting non-PDF to PDF at print time
     let lastPrintJob: any = null;
     for (const f of filesToPrint) {
-      // Convert non-PDF files (DOCX, PPTX, images) to PDF just before printing
-      const effectivePath = await convertToPdf(f.filePath, (f as any).mimeType ?? '');
+      // Use pre-converted PDF path if available, or convert at print time
+      const effectivePath = (f as any).pdfFilePath || await convertToPdf(f.filePath, (f as any).mimeType ?? '');
       const printJob = await submitPrintJob({
         filePath: effectivePath,
         fileName: f.fileName,
