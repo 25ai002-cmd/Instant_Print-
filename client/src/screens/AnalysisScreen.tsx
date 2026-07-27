@@ -21,7 +21,7 @@ export const AnalysisScreen: React.FC = () => {
     cancelSession,
   } = useSessionStore();
 
-  const [isPreviewOpen, setIsPreviewOpen] = useState(true);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewFileIdx, setPreviewFileIdx] = useState(0);
 
   if (!analysis || !priceBreakdown) {
@@ -249,7 +249,7 @@ export const AnalysisScreen: React.FC = () => {
           onClick={() => setScreen('settings')}
           className="btn btn-primary"
         >
-          Customize Settings <ChevronRight size={18} />
+          Configure Print Settings <ChevronRight size={18} />
         </button>
 
         <button
@@ -270,7 +270,7 @@ export const AnalysisScreen: React.FC = () => {
             mimeType: 'application/pdf',
             pageCount: analysis?.pageCount || 1,
           }]}
-          onConfirmPrint={() => setScreen('payment')}
+          onConfirmPrint={() => setScreen('settings')}
           onOpenSettings={() => setScreen('settings')}
         />
       )}
