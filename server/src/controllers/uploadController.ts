@@ -80,32 +80,24 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Process document and generate PDF preview version
+    // Fast instant document analysis at upload time (<100ms)
     try {
-      console.log(`[Upload] Generating PDF preview for "${file.originalname}"...`);
-      const effectivePdfPath = await convertToPdf(file.path, file.mimetype);
-      const pdfFileName = path.basename(effectivePdfPath);
-      const pdfUrl = `/uploads/${sessionId}/${pdfFileName}`;
+      const analysis = await analyzeDocument(file.path, file.mimetype);
       const originalUrl = `/uploads/${sessionId}/${path.basename(file.path)}`;
-
-      // Analyze the converted PDF document
-      const analysis = await analyzeDocument(effectivePdfPath, 'application/pdf');
 
       const docItem: UploadedFile = {
         id: crypto.randomUUID(),
-        filePath: file.path,           // Preserve 100% original file path
-        pdfFilePath: effectivePdfPath, // Store converted PDF path for preview/print
-        url: originalUrl,              // Preserve 100% original file URL
-        previewUrl: pdfUrl,            // Converted PDF URL for preview
+        filePath: file.path,
+        url: originalUrl,
         fileName: file.originalname,
         fileSize: file.size,
-        mimeType: file.mimetype,       // Preserve 100% original MIME type (e.g. .docx)
+        mimeType: file.mimetype,
         pageCount: analysis.pageCount,
         colorPages: analysis.colorPages,
         bwPages: analysis.bwPages,
         orientation: analysis.orientation,
         paperSize: analysis.paperSize,
-        isEstimate: false,
+        isEstimate: analysis.isEstimate,
       };
 
       newUploadedFiles.push(docItem);
@@ -125,10 +117,10 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
             bwPages: analysis.bwPages,
             orientation: analysis.orientation,
             paperSize: analysis.paperSize,
-            isEstimate: false,
+            isEstimate: analysis.isEstimate,
           },
         });
-        console.log(`[Upload] Document persisted to database: "${file.originalname}" (${file.mimetype}) -> PDF preview: ${pdfFileName}`);
+        console.log(`[Upload] Document analyzed and persisted instantly: "${file.originalname}" (${file.mimetype})`);
       } catch (dbErr) {
         console.warn('[Upload] Database document log notice:', dbErr);
       }
