@@ -61,6 +61,31 @@ export async function detectBrotherPrinter(): Promise<{
       };
     }
 
+    // Windows Fallback: Query Win32_Printer CIM instances
+    if (process.platform === 'win32') {
+      try {
+        const { stdout } = await execAsync(
+          `powershell -Command "Get-CimInstance Win32_Printer | Select-Object Name | ConvertTo-Json"`
+        );
+        const parsed = JSON.parse(stdout.trim() || '[]');
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        const cimBrother = list.find((p) =>
+          String(p.Name).toLowerCase().includes('brother') ||
+          String(p.Name).toLowerCase().includes('dcp')
+        );
+        if (cimBrother) {
+          return {
+            installed: true,
+            name: String(cimBrother.Name),
+            status: 'Normal',
+            allPrinters: allNames,
+          };
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
     const realPrinter = printerList.find(
       (p) =>
         !p.name.toLowerCase().includes('pdf') &&
@@ -130,15 +155,22 @@ export async function submitPrintJob(params: {
   const detected = await detectBrotherPrinter();
 
   if (detected.installed && detected.name) {
-    console.log(`[Printer] Found physical printer: "${detected.name}". Executing silent hardware print...`);
+    console.log(`[Printer] Found physical printer: "${detected.name}". Executing hardware print...`);
     executePhysicalPrint(jobId, params, detected.name);
   } else {
-    console.log(
-      `[Printer] Printer not currently detected. Installed printers: [${detected.allPrinters.join(
-        ', '
-      )}]. Using high-precision simulation.`
+    console.warn(
+      `[Printer] Hardware printer not detected. Installed printers: [${detected.allPrinters.join(', ')}].`
     );
-    simulatePrintProgress(jobId, totalPages);
+    // Mark job as failed with clear message so user knows printer is offline
+    setTimeout(() => {
+      jobs.set(jobId, {
+        ...job,
+        status: 'failed',
+        error: `Physical printer not connected or turned OFF. Installed printers found: [${detected.allPrinters.join(
+          ', '
+        )}]. Please power ON your Brother printer and connect USB.`,
+      });
+    }, 1000);
   }
 
   return job;
