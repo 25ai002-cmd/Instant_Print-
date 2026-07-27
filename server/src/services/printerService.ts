@@ -12,6 +12,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { countPagesInRanges } from './priceService.js';
 import type { PrintJob, PrintJobStatus } from '../types/index.js';
 
+import pdfToPrinter from 'pdf-to-printer';
+import { convertToPdf } from './fileService.js';
+
+const { print: pdfPrint, getPrinters } = pdfToPrinter;
+
 const execAsync = (cmd: string) =>
   new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
     exec(cmd, { timeout: 1800000, maxBuffer: 500 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -36,24 +41,39 @@ export async function detectBrotherPrinter(): Promise<{
   allPrinters: string[];
 }> {
   try {
-    const { stdout } = await execAsync(
-      `powershell -Command "Get-Printer | Select-Object Name, PrinterStatus | ConvertTo-Json"`
-    );
-    const parsed = JSON.parse(stdout.trim() || '[]');
-    const printerList = Array.isArray(parsed) ? parsed : [parsed];
+    const printerList = await getPrinters();
+    const allNames = printerList.map((p) => String(p.name));
 
-    const allNames = printerList.map((p) => String(p.Name));
-    const brotherMatch = printerList.find((p) =>
-      String(p.Name).toLowerCase().includes('brother') ||
-      String(p.Name).toLowerCase().includes('dcp-l2531dw') ||
-      String(p.Name).toLowerCase().includes('dcp-l2530dw')
+    const brotherMatch = printerList.find(
+      (p) =>
+        p.name.toLowerCase().includes('brother') ||
+        p.name.toLowerCase().includes('dcp-l2531dw') ||
+        p.name.toLowerCase().includes('dcp-l2530dw') ||
+        p.name.toLowerCase().includes('dcp')
     );
 
     if (brotherMatch) {
       return {
         installed: true,
-        name: brotherMatch.Name,
-        status: String(brotherMatch.PrinterStatus || 'Normal'),
+        name: brotherMatch.name,
+        status: 'Normal',
+        allPrinters: allNames,
+      };
+    }
+
+    const realPrinter = printerList.find(
+      (p) =>
+        !p.name.toLowerCase().includes('pdf') &&
+        !p.name.toLowerCase().includes('xps') &&
+        !p.name.toLowerCase().includes('onenote') &&
+        !p.name.toLowerCase().includes('fax')
+    );
+
+    if (realPrinter) {
+      return {
+        installed: true,
+        name: realPrinter.name,
+        status: 'Normal',
         allPrinters: allNames,
       };
     }
@@ -84,9 +104,10 @@ export async function submitPrintJob(params: {
   pageRanges?: Array<{ from: number; to: number }>;
 }): Promise<PrintJob> {
   const jobId = uuidv4();
-  const selectedPageCount = (params.pageRanges && params.pageRanges.length > 0)
-    ? countPagesInRanges(params.pageRanges, params.pageCount)
-    : params.pageCount;
+  const selectedPageCount =
+    params.pageRanges && params.pageRanges.length > 0
+      ? countPagesInRanges(params.pageRanges, params.pageCount)
+      : params.pageCount;
   const numCopies = Math.max(1, params.copies || 1);
   const totalPages = selectedPageCount * numCopies;
 
@@ -101,20 +122,21 @@ export async function submitPrintJob(params: {
   };
 
   jobs.set(jobId, job);
-  console.log(`[Printer] Job queued: ${jobId} (${totalPages} total pages across ${numCopies} copy/copies, sides: ${params.sides}) for file: ${params.fileName}`);
+  console.log(
+    `[Printer] Job queued: ${jobId} (${totalPages} total pages across ${numCopies} copy/copies, sides: ${params.sides}) for file: ${params.fileName}`
+  );
 
   // Check if real Brother printer is connected on Windows
   const detected = await detectBrotherPrinter();
 
   if (detected.installed && detected.name) {
-    console.log(`[Printer] Found physical Brother printer: "${detected.name}". Executing silent USB print...`);
-    // Execute real print asynchronously
+    console.log(`[Printer] Found physical printer: "${detected.name}". Executing silent hardware print...`);
     executePhysicalPrint(jobId, params, detected.name);
   } else {
     console.log(
-      `[Printer] Brother DCP-L2531DW not currently detected on USB. Installed printers: [${detected.allPrinters.join(
+      `[Printer] Printer not currently detected. Installed printers: [${detected.allPrinters.join(
         ', '
-      )}]. Using high-precision kiosk simulation.`
+      )}]. Using high-precision simulation.`
     );
     simulatePrintProgress(jobId, totalPages);
   }
@@ -123,7 +145,7 @@ export async function submitPrintJob(params: {
 }
 
 /**
- * Send print job directly to Brother DCP-L2531DW spooler on Windows.
+ * Send print job directly to physical printer hardware spooler via pdf-to-printer.
  */
 async function executePhysicalPrint(
   jobId: string,
@@ -139,42 +161,43 @@ async function executePhysicalPrint(
   const job = jobs.get(jobId);
   if (!job) return;
 
-  // Update status to printing
   jobs.set(jobId, { ...job, status: 'printing', progress: 10 });
 
   const absolutePath = path.resolve(params.filePath);
   const ext = path.extname(absolutePath).toLowerCase();
 
   try {
-    // 1. Configure Duplexing (Double-Sided vs Single-Sided) on Windows Printer Spooler
+    // 1. Ensure file is in PDF format for direct hardware spooling
+    const pdfPath = await convertToPdf(absolutePath, ext.startsWith('.') ? ext : '');
+
+    // 2. Configure duplexing on Windows Printer Spooler
     const duplexSetting = params.sides === 'double' ? 'TwoSidedLongEdge' : 'OneSided';
     const setDuplexCmd = `powershell -Command "Set-PrintConfiguration -PrinterName '${printerName}' -Duplexing ${duplexSetting} -ErrorAction SilentlyContinue"`;
+    await execAsync(setDuplexCmd).catch((e) => console.warn('[Printer] Duplexing notice:', e.message));
 
-    console.log(`[Printer] Setting Windows printer Duplexing to ${duplexSetting} for "${printerName}"...`);
-    await execAsync(setDuplexCmd).catch((e) => console.warn('[Printer] Duplexing configuration notice:', e.message));
+    // 3. Build pdf-to-printer options
+    const printOptions: any = {
+      printer: printerName,
+      copies: Math.max(1, params.copies || 1),
+    };
 
-    // 2. Execute print command for each requested copy
-    const numCopies = Math.max(1, params.copies || 1);
-    console.log(`[Printer] Spooling ${numCopies} copy(ies) of "${absolutePath}" to "${printerName}"...`);
-
-    for (let c = 0; c < numCopies; c++) {
-      let printCmd = '';
-      if (ext === '.pdf') {
-        printCmd = `powershell -Command "Start-Process -FilePath '${absolutePath}' -Verb PrintTo -ArgumentList '${printerName}' -WindowStyle Hidden"`;
-      } else if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
-        printCmd = `rundll32.exe C:\\WINDOWS\\System32\\shimgvw.dll,ImageView_PrintTo /pt "${absolutePath}" "${printerName}"`;
-      } else {
-        printCmd = `powershell -Command "Start-Process -FilePath '${absolutePath}' -Verb Print -WindowStyle Hidden"`;
-      }
-
-      await execAsync(printCmd);
+    if (params.sides === 'double') {
+      printOptions.side = 'duplexlong';
+    } else {
+      printOptions.side = 'simplex';
     }
 
-    // Track job to completion
+    if (params.pageRanges && params.pageRanges.length > 0) {
+      printOptions.pages = params.pageRanges.map((r) => `${r.from}-${r.to}`).join(',');
+    }
+
+    console.log(`[Printer] Spooling PDF directly to printer hardware "${printerName}":`, printOptions);
+    await pdfPrint(pdfPath, printOptions);
+    console.log(`[Printer] Hardware print command successfully sent to printer "${printerName}".`);
+
     simulatePrintProgress(jobId, job.totalPages);
   } catch (err) {
-    console.error(`[Printer] Hardware print command failed for job ${jobId}:`, err);
-    // Fallback to progress tracking so kiosk experience is uninterrupted
+    console.error(`[Printer] Hardware print command error for job ${jobId}:`, err);
     simulatePrintProgress(jobId, job.totalPages);
   }
 }
