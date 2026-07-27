@@ -77,7 +77,12 @@ const clientDistPath = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDistPath));
 
 app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path === '/health') {
+  if (
+    req.path.startsWith('/api') ||
+    req.path.startsWith('/uploads') ||
+    req.path.startsWith('/socket.io') ||
+    req.path === '/health'
+  ) {
     return next();
   }
   res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {

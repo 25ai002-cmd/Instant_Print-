@@ -219,12 +219,6 @@ async function executePhysicalPrint(
       copies: Math.max(1, params.copies || 1),
     };
 
-    if (params.sides === 'double') {
-      printOptions.side = 'duplexlong';
-    } else {
-      printOptions.side = 'simplex';
-    }
-
     if (params.pageRanges && params.pageRanges.length > 0) {
       printOptions.pages = params.pageRanges.map((r) => `${r.from}-${r.to}`).join(',');
     }

@@ -20,20 +20,20 @@ log(` Target USB Printer: ${PRINTER_NAME}`);
 log(`===================================================`);
 
 const socket = io(SERVER_URL, {
-  transports: ['websocket'],
+  transports: ['polling', 'websocket'],
   reconnection: true,
-  reconnectionDelay: 2000,
+  reconnectionDelay: 1000,
   reconnectionAttempts: Infinity,
 });
 
 socket.on('connect', () => {
-  log(`✅ CONNECTED TO CLOUD SERVER WEBSOCKET! Socket ID: ${socket.id}`);
+  log(`✅ CONNECTED TO CLOUD SERVER! Socket ID: ${socket.id}`);
   socket.emit('JOIN_MACHINE_ROOM', { machineCode: MACHINE_CODE });
   socket.emit('MACHINE_HEARTBEAT', { machineCode: MACHINE_CODE, status: 'ONLINE' });
 });
 
 socket.on('connect_error', (err) => {
-  log(`⚠️ Connection error to ${SERVER_URL}: ${err.message}. Retrying...`);
+  log(`⚠️ Connection notice to ${SERVER_URL}: ${err.message}. Retrying...`);
 });
 
 socket.on('disconnect', () => {
@@ -65,18 +65,12 @@ socket.on('JOB_ASSIGNED', async (jobData: any) => {
     const buffer = Buffer.from(arrayBuffer);
     await fs.writeFile(tempPath, buffer);
 
-    // 2. Spool document to physical Brother printer
+    // 2. Spool document to physical Brother printer (clean SumatraPDF options)
     log(`Spooling PDF directly to printer "${PRINTER_NAME}"...`);
     const printOptions: any = {
       printer: PRINTER_NAME,
       copies: Math.max(1, jobData.copies || 1),
     };
-
-    if (jobData.sides === 'double') {
-      printOptions.side = 'duplexlong';
-    } else {
-      printOptions.side = 'simplex';
-    }
 
     if (jobData.pageRanges && jobData.pageRanges.length > 0) {
       printOptions.pages = jobData.pageRanges.map((r: any) => `${r.from}-${r.to}`).join(',');
