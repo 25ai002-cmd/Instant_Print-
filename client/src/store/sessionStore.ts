@@ -222,11 +222,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }
       return false;
     } catch (err: any) {
-      // If session is deleted, it might return 404, which means it finished and was cleaned up!
-      if (err.response?.status === 404) {
-        set({ currentScreen: 'done' });
-        return true;
-      }
+      console.warn('[PollPrintJob] Polling status notice:', err.message);
       return false;
     }
   },

@@ -13,9 +13,19 @@ import libre from 'libreoffice-convert';
 import util from 'util';
 import { exec } from 'child_process';
 import type { DocumentAnalysis, Orientation, PaperSize } from '../types/index.js';
+import JSZip from 'jszip';
 
 const libreConvert = util.promisify(libre.convert);
 const execAsync = util.promisify(exec);
+
+const execWithTimeout = (cmd: string, timeoutMs: number = 12000) => {
+  return Promise.race([
+    execAsync(cmd),
+    new Promise<{ stdout: string; stderr: string }>((_, reject) =>
+      setTimeout(() => reject(new Error(`Command timed out after ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ]);
+};
 
 /**
  * Convert any uploaded file (.docx, .pptx, .png, .jpg, .jpeg, .webp) to PDF internally
@@ -29,42 +39,50 @@ export async function convertToPdf(filePath: string, mimeType: string): Promise<
   }
 
   const absoluteInputPath = path.resolve(filePath);
-  const pdfPath = `${absoluteInputPath}.pdf`;
+  const pdfPath = absoluteInputPath.replace(/\.[^/.]+$/, '') + '.pdf';
 
-  // 1. Convert Images (PNG, JPG, WEBP) -> PDF
-  if (mimeType.startsWith('image/') || ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
+  // Check if PDF conversion already exists
+  const alreadyConverted = await fs.stat(pdfPath).then(() => true).catch(() => false);
+  if (alreadyConverted) {
+    return pdfPath;
+  }
+
+  // 1. Convert Images (.png, .jpg, .jpeg, .webp) -> PDF
+  if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext) || mimeType.startsWith('image/')) {
     try {
+      const imgBuffer = await fs.readFile(absoluteInputPath);
       const pdfDoc = await PDFDocument.create();
-      const imageBytes = await fs.readFile(absoluteInputPath);
       let image;
       if (ext === '.png' || mimeType === 'image/png') {
-        image = await pdfDoc.embedPng(imageBytes);
+        image = await pdfDoc.embedPng(imgBuffer);
+      } else if (ext === '.webp' || mimeType === 'image/webp') {
+        return filePath;
       } else {
-        image = await pdfDoc.embedJpg(imageBytes);
+        image = await pdfDoc.embedJpg(imgBuffer);
       }
-      const page = pdfDoc.addPage([image.width, image.height]);
-      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
-
-      const pdfBytes = await pdfDoc.save();
-      await fs.writeFile(pdfPath, pdfBytes);
-      console.log(`[PDF Converter] Converted image ${absoluteInputPath} -> ${pdfPath}`);
-      return pdfPath;
-    } catch (err) {
-      console.warn('[PDF Converter] Image to PDF conversion warning:', err);
-      return absoluteInputPath;
+      if (image) {
+        const page = pdfDoc.addPage([image.width, image.height]);
+        page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+        const pdfBytes = await pdfDoc.save();
+        await fs.writeFile(pdfPath, pdfBytes);
+        console.log(`[PDF Converter] Converted image ${absoluteInputPath} -> ${pdfPath}`);
+        return pdfPath;
+      }
+    } catch (imgErr) {
+      console.warn('[PDF Converter] Image conversion warning:', imgErr);
     }
   }
 
   // 2. Convert Office Docs (.docx, .pptx) -> PDF
   if (mimeType.includes('officedocument') || ['.docx', '.pptx', '.doc', '.ppt'].includes(ext)) {
-    // Primary on Windows: Try PowerShell Microsoft Word COM automation
+    // Primary on Windows: Try PowerShell Microsoft Word COM automation with 12s timeout
     if (process.platform === 'win32') {
       try {
         const escapedPath = absoluteInputPath.replace(/'/g, "''");
         const escapedPdf = pdfPath.replace(/'/g, "''");
         const psCmd = `powershell -Command "$word = New-Object -ComObject Word.Application; $word.Visible = $false; $word.DisplayAlerts = 0; $word.Options.SaveNormalPrompt = $false; $word.Options.SavePropertiesPrompt = $false; $doc = $word.Documents.Open('${escapedPath}', $false, $true, $false); $doc.SaveAs([ref]'${escapedPdf}', [ref]17); $doc.Saved = $true; $doc.Close([ref]0); $word.Quit()"`;
         console.log(`[PDF Converter] Windows Word COM converting ${absoluteInputPath} -> ${pdfPath}...`);
-        await execAsync(psCmd);
+        await execWithTimeout(psCmd, 12000);
         const exists = await fs.stat(pdfPath).then(() => true).catch(() => false);
         if (exists) {
           console.log(`[PDF Converter] Windows Word COM conversion successful: ${pdfPath}`);
@@ -351,8 +369,6 @@ async function analyzePdf(filePath: string): Promise<DocumentAnalysis> {
     isEstimate: false,
   };
 }
-
-import JSZip from 'jszip';
 
 async function getDocxExactPageCount(filePath: string): Promise<number | null> {
   try {
