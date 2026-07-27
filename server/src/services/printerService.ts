@@ -150,26 +150,31 @@ export async function submitPrintJob(params: {
     `[Printer] Job queued: ${jobId} (${totalPages} total pages across ${numCopies} copy/copies, sides: ${params.sides}) for file: ${params.fileName}`
   );
 
-  // Check if real Brother printer is connected on Windows
-  const detected = await detectBrotherPrinter();
-
-  if (detected.installed && detected.name) {
-    console.log(`[Printer] Found physical printer: "${detected.name}". Executing hardware print...`);
-    executePhysicalPrint(jobId, params, detected.name);
+  // Local Windows Execution vs Cloud Remote Kiosk Execution
+  if (process.platform === 'win32') {
+    const detected = await detectBrotherPrinter();
+    if (detected.installed && detected.name) {
+      console.log(`[Printer] Found local physical printer: "${detected.name}". Executing hardware print...`);
+      executePhysicalPrint(jobId, params, detected.name);
+    } else {
+      setTimeout(() => {
+        jobs.set(jobId, {
+          ...job,
+          status: 'failed',
+          error: `Physical printer not connected or turned OFF. Installed printers found: [${detected.allPrinters.join(
+            ', '
+          )}]. Please power ON your Brother printer and connect USB.`,
+        });
+      }, 1000);
+    }
   } else {
-    console.warn(
-      `[Printer] Hardware printer not detected. Installed printers: [${detected.allPrinters.join(', ')}].`
+    // Cloud Server Environment (Render): Delegate hardware printing to local Kiosk Agent over WebSocket
+    console.log(
+      `[Printer] Cloud Server queued Job ${jobId}. Awaiting Kiosk Hardware Agent (ATM001) spooling...`
     );
-    // Mark job as failed with clear message so user knows printer is offline
-    setTimeout(() => {
-      jobs.set(jobId, {
-        ...job,
-        status: 'failed',
-        error: `Physical printer not connected or turned OFF. Installed printers found: [${detected.allPrinters.join(
-          ', '
-        )}]. Please power ON your Brother printer and connect USB.`,
-      });
-    }, 1000);
+    // Set status to printing while agent downloads and spools file
+    job.status = 'printing';
+    jobs.set(jobId, job);
   }
 
   return job;
@@ -279,6 +284,25 @@ function simulatePrintProgress(jobId: string, totalPages: number): void {
       jobs.set(jobId, updatedJob);
       console.log(`[Printer] Job ${jobId}: ${stage.progress}% (${stage.status})`);
     }, cumulativeDelay);
+  }
+}
+
+/**
+ * Update in-memory print job status from WebSocket event (Kiosk Agent completion).
+ */
+export function updateMemoryJobStatus(jobId: string, status: string, error?: string): void {
+  const existing = jobs.get(jobId);
+  if (existing) {
+    const isDone = status.toUpperCase() === 'COMPLETED';
+    const isFail = status.toUpperCase() === 'FAILED';
+    jobs.set(jobId, {
+      ...existing,
+      status: isDone ? 'completed' : isFail ? 'failed' : (status.toLowerCase() as any),
+      progress: isDone ? 100 : existing.progress,
+      printedPages: isDone ? existing.totalPages : existing.printedPages,
+      ...(error ? { error } : {}),
+    });
+    console.log(`[Printer] Memory job ${jobId} status updated to: ${status}`);
   }
 }
 

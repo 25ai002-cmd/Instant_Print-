@@ -7,6 +7,7 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import type { Server as HTTPServer } from 'http';
 import { prisma } from '../db/prisma.js';
+import { updateMemoryJobStatus } from './printerService.js';
 
 let io: SocketIOServer | null = null;
 
@@ -84,6 +85,9 @@ export function initSocketService(httpServer: HTTPServer): SocketIOServer {
       const { jobId, status, failureReason } = data;
       if (!jobId || !status) return;
 
+      // Update in-memory session printer job state
+      updateMemoryJobStatus(jobId, status, failureReason);
+
       try {
         const job = await prisma.printJob.update({
           where: { id: jobId },
@@ -98,7 +102,7 @@ export function initSocketService(httpServer: HTTPServer): SocketIOServer {
         io?.emit(`JOB_STATUS_CHANGED:${jobId}`, { jobId, status, failureReason });
         console.log(`[WebSocket] Job ${jobId} status updated to: ${status}`);
       } catch (err) {
-        console.error(`[WebSocket] Failed to update job status for ${jobId}:`, err);
+        console.warn(`[WebSocket] DB status update note for ${jobId}:`, (err as Error).message);
       }
     });
 

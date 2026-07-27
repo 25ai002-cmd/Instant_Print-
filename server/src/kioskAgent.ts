@@ -8,38 +8,55 @@ const SERVER_URL = process.env.CLOUD_URL || process.env.PUBLIC_URL || 'http://lo
 const MACHINE_CODE = process.env.MACHINE_CODE || 'ATM001';
 const PRINTER_NAME = process.env.PRINTER_NAME || 'Brother DCP-L2530DW series';
 
-console.log(`===================================================`);
-console.log(` 🖨️  PrintATM Kiosk Hardware Agent Starting...`);
-console.log(` Connecting to Cloud Server: ${SERVER_URL}`);
-console.log(` Kiosk Machine Code: ${MACHINE_CODE}`);
-console.log(` Target USB Printer: ${PRINTER_NAME}`);
-console.log(`===================================================`);
+function log(msg: string) {
+  console.log(`[${new Date().toLocaleTimeString()}] ${msg}`);
+}
+
+log(`===================================================`);
+log(` 🖨️  PrintATM Kiosk Hardware Agent Starting...`);
+log(` Connecting to Cloud Server: ${SERVER_URL}`);
+log(` Kiosk Machine Code: ${MACHINE_CODE}`);
+log(` Target USB Printer: ${PRINTER_NAME}`);
+log(`===================================================`);
 
 const socket = io(SERVER_URL, {
-  transports: ['websocket', 'polling'],
+  transports: ['websocket'],
   reconnection: true,
   reconnectionDelay: 2000,
+  reconnectionAttempts: Infinity,
 });
 
 socket.on('connect', () => {
-  console.log(`[Kiosk Agent] Connected to Cloud Server WebSocket! Socket ID: ${socket.id}`);
+  log(`✅ CONNECTED TO CLOUD SERVER WEBSOCKET! Socket ID: ${socket.id}`);
   socket.emit('JOIN_MACHINE_ROOM', { machineCode: MACHINE_CODE });
+  socket.emit('MACHINE_HEARTBEAT', { machineCode: MACHINE_CODE, status: 'ONLINE' });
+});
+
+socket.on('connect_error', (err) => {
+  log(`⚠️ Connection error to ${SERVER_URL}: ${err.message}. Retrying...`);
 });
 
 socket.on('disconnect', () => {
-  console.warn(`[Kiosk Agent] Disconnected from Cloud Server. Reconnecting...`);
+  log(`⚠️ Disconnected from Cloud Server. Reconnecting...`);
 });
 
+// Send heartbeat every 10s to keep cloud session awake and reported online
+setInterval(() => {
+  if (socket.connected) {
+    socket.emit('MACHINE_HEARTBEAT', { machineCode: MACHINE_CODE, status: 'ONLINE' });
+  }
+}, 10000);
+
 socket.on('JOB_ASSIGNED', async (jobData: any) => {
-  console.log(`[Kiosk Agent] 🚀 NEW PRINT JOB RECEIVED: ${jobData.jobCode}`);
-  console.log(` Document URL: ${jobData.fileUrl}`);
-  console.log(` Copies: ${jobData.copies}, Sides: ${jobData.sides}`);
+  log(`🚀 NEW PRINT JOB RECEIVED: ${jobData.jobCode}`);
+  log(` Document URL: ${jobData.fileUrl}`);
+  log(` Copies: ${jobData.copies}, Sides: ${jobData.sides}`);
 
   const tempPath = path.join(process.cwd(), `temp_${jobData.jobId}.pdf`);
 
   try {
     // 1. Download document from Cloud Server
-    console.log(`[Kiosk Agent] Downloading document from cloud...`);
+    log(`Downloading document from cloud server...`);
     const response = await fetch(jobData.fileUrl);
     if (!response.ok) {
       throw new Error(`Failed to download document from cloud server: ${response.statusText}`);
@@ -49,7 +66,7 @@ socket.on('JOB_ASSIGNED', async (jobData: any) => {
     await fs.writeFile(tempPath, buffer);
 
     // 2. Spool document to physical Brother printer
-    console.log(`[Kiosk Agent] Spooling PDF directly to printer "${PRINTER_NAME}"...`);
+    log(`Spooling PDF directly to printer "${PRINTER_NAME}"...`);
     const printOptions: any = {
       printer: PRINTER_NAME,
       copies: Math.max(1, jobData.copies || 1),
@@ -66,11 +83,11 @@ socket.on('JOB_ASSIGNED', async (jobData: any) => {
     }
 
     await pdfToPrinter.print(tempPath, printOptions);
-    console.log(`[Kiosk Agent] ✅ Physical print successfully spooled to Brother printer!`);
+    log(`✅ Physical print successfully spooled to Brother printer!`);
 
     socket.emit('UPDATE_JOB_STATUS', { jobId: jobData.jobId, status: 'COMPLETED' });
   } catch (err: any) {
-    console.error(`[Kiosk Agent] ❌ Hardware print execution error:`, err.message);
+    log(`❌ Hardware print execution error: ${err.message}`);
     socket.emit('UPDATE_JOB_STATUS', { jobId: jobData.jobId, status: 'FAILED', failureReason: err.message });
   } finally {
     await fs.unlink(tempPath).catch(() => {});
