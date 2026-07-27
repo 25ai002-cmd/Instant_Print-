@@ -199,8 +199,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const { sessionId } = get();
     if (!sessionId) return;
     try {
+      set({ error: null, currentScreen: 'printing', loading: true });
       const data = await apiService.startPrint(sessionId);
-      set({ printJob: data.printJob });
+      set({ printJob: data.printJob, loading: false });
     } catch (err: any) {
       set({ currentScreen: 'failed', error: `Printer Error: ${err.message}`, loading: false });
     }
