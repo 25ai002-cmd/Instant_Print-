@@ -30,22 +30,38 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3002;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
-// Security Headers & CORS
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
-app.use(cors({
-  origin: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true,
-}));
+// Security Headers & CORS (Allow Iframe Preview & Static Upload Access)
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    frameguard: false,
+  })
+);
+
+app.use(
+  cors({
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  })
+);
 
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
-// Serve temporary uploads directory statically
+// Serve temporary uploads directory statically with explicit CORS & framing headers
 const uploadsStaticPath = path.resolve(process.env.UPLOAD_DIR || './uploads');
-app.use('/uploads', express.static(uploadsStaticPath));
+app.use(
+  '/uploads',
+  (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(uploadsStaticPath)
+);
 
 // Request Logger
 app.use((req, _res, next) => {

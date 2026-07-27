@@ -165,6 +165,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     setConvertedPdfUrl(null);
   }, [selectedFileIdx]);
 
+  // Auto-trigger high-fidelity PDF preview conversion for Word/Office files on demand
+  useEffect(() => {
+    if (isDocx && !convertedPdfUrl && !isConverting && sessionId && activeFile?.id) {
+      convertAndPreview();
+    }
+  }, [selectedFileIdx, isDocx, sessionId, activeFile?.id]);
+
   // Extract PDF page count on client
   useEffect(() => {
     if (isPdf && (activeFile?.fileObj || activeUrl)) {
