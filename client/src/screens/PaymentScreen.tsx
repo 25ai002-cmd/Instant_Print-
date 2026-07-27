@@ -11,12 +11,23 @@ export const PaymentScreen: React.FC = () => {
     sessionId,
     paymentInfo,
     priceBreakdown,
+    generatePayment,
     setPaymentSuccess,
     setScreen,
+    error,
   } = useSessionStore();
 
   const [paymentVerifying, setPaymentVerifying] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  // Auto-generate payment if paymentInfo is null when entering PaymentScreen
+  React.useEffect(() => {
+    if (!paymentInfo && sessionId) {
+      generatePayment().catch((err) => {
+        setLocalError(err.message || 'Could not initialize payment gateway.');
+      });
+    }
+  }, [paymentInfo, sessionId, generatePayment]);
 
   // 3-minute payment window
   const { formatTime } = useCountdown(180, () => {
@@ -67,9 +78,45 @@ export const PaymentScreen: React.FC = () => {
         flex: 1,
         padding: '24px',
         color: 'var(--text-secondary)',
+        textAlign: 'center',
       }}>
-        <Loader2 className="animate-spin" size={28} style={{ marginBottom: '16px', color: 'var(--primary)' }} />
-        <span>Initializing secure payment gateway...</span>
+        {error || localError ? (
+          <>
+            <AlertCircle size={36} color="var(--error)" style={{ marginBottom: '12px' }} />
+            <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
+              {error || localError || 'Could not initialize payment gateway.'}
+            </span>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => {
+                  setLocalError(null);
+                  generatePayment();
+                }}
+                className="btn btn-primary"
+                style={{ padding: '10px 18px', fontSize: '14px', width: 'auto' }}
+              >
+                Retry Payment
+              </button>
+              <button
+                onClick={() => setScreen('settings')}
+                className="btn btn-secondary"
+                style={{ padding: '10px 18px', fontSize: '14px', width: 'auto' }}
+              >
+                Back to Settings
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Loader2 className="animate-spin" size={32} style={{ marginBottom: '16px', color: 'var(--primary)' }} />
+            <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Initializing secure payment gateway...
+            </span>
+            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '8px' }}>
+              Creating UPI payment QR code
+            </p>
+          </>
+        )}
       </div>
     );
   }
