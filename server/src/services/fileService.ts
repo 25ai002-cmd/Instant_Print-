@@ -62,7 +62,7 @@ export async function convertToPdf(filePath: string, mimeType: string): Promise<
       try {
         const escapedPath = absoluteInputPath.replace(/'/g, "''");
         const escapedPdf = pdfPath.replace(/'/g, "''");
-        const psCmd = `powershell -Command "$word = New-Object -ComObject Word.Application; $word.Visible = $false; $doc = $word.Documents.Open('${escapedPath}'); $doc.SaveAs([ref]'${escapedPdf}', [ref]17); $doc.Close(); $word.Quit()"`;
+        const psCmd = `powershell -Command "$word = New-Object -ComObject Word.Application; $word.Visible = $false; $word.DisplayAlerts = 0; $doc = $word.Documents.Open('${escapedPath}', $false, $true, $false); $doc.SaveAs([ref]'${escapedPdf}', [ref]17); $doc.Close([ref]0); $word.Quit()"`;
         console.log(`[PDF Converter] Windows Word COM converting ${absoluteInputPath} -> ${pdfPath}...`);
         await execAsync(psCmd);
         const exists = await fs.stat(pdfPath).then(() => true).catch(() => false);
