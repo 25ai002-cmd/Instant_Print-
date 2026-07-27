@@ -127,9 +127,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   const isDocx = activeFile?.mimeType?.includes('wordprocessingml') ||
     activeFile?.fileName?.toLowerCase().endsWith('.docx');
 
-  const isOnlineUrl = activeUrl.startsWith('http://') || activeUrl.startsWith('https://');
-
-  const targetPdfUrl = convertedPdfUrl || (activeFile?.previewUrl?.toLowerCase().includes('.pdf') ? activeFile.previewUrl : null);
+  const targetPdfUrl = convertedPdfUrl;
 
   // Effective URL — use converted PDF URL if available (keep as relative path for Vite proxy)
   const effectivePdfUrl = targetPdfUrl
@@ -193,8 +191,9 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         if (activeFile?.fileObj) {
           return activeFile.fileObj.arrayBuffer();
         }
-        // Fetch from server when no local fileObj (e.g. after upload)
-        return fetch(activeUrl).then((r) => {
+        // Fetch original .docx file from server
+        const docxUrl = activeFile?.url || activeUrl;
+        return fetch(docxUrl).then((r) => {
           if (!r.ok) throw new Error(`Fetch failed: ${r.status}`);
           return r.arrayBuffer();
         });
