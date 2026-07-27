@@ -161,14 +161,16 @@ async function executePhysicalPrint(
   const job = jobs.get(jobId);
   if (!job) return;
 
-  jobs.set(jobId, { ...job, status: 'printing', progress: 10 });
+  jobs.set(jobId, { ...job, status: 'printing', progress: 20 });
 
   const absolutePath = path.resolve(params.filePath);
   const ext = path.extname(absolutePath).toLowerCase();
 
   try {
     // 1. Ensure file is in PDF format for direct hardware spooling
+    console.log(`[Printer] Preparing PDF for hardware printing: "${absolutePath}"...`);
     const pdfPath = await convertToPdf(absolutePath, ext.startsWith('.') ? ext : '');
+    jobs.set(jobId, { ...jobs.get(jobId)!, progress: 40 });
 
     // 2. Configure duplexing on Windows Printer Spooler
     const duplexSetting = params.sides === 'double' ? 'TwoSidedLongEdge' : 'OneSided';
@@ -192,13 +194,26 @@ async function executePhysicalPrint(
     }
 
     console.log(`[Printer] Spooling PDF directly to printer hardware "${printerName}":`, printOptions);
+    jobs.set(jobId, { ...jobs.get(jobId)!, progress: 60 });
+
     await pdfPrint(pdfPath, printOptions);
     console.log(`[Printer] Hardware print command successfully sent to printer "${printerName}".`);
 
-    simulatePrintProgress(jobId, job.totalPages);
+    // Mark job as completed ONLY AFTER physical hardware print command succeeds
+    jobs.set(jobId, {
+      ...jobs.get(jobId)!,
+      status: 'completed',
+      progress: 100,
+      printedPages: job.totalPages,
+      completedAt: new Date(),
+    });
   } catch (err) {
     console.error(`[Printer] Hardware print command error for job ${jobId}:`, err);
-    simulatePrintProgress(jobId, job.totalPages);
+    jobs.set(jobId, {
+      ...jobs.get(jobId)!,
+      status: 'failed',
+      error: (err as Error).message || 'Hardware printing failed',
+    });
   }
 }
 
