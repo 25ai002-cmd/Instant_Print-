@@ -75,30 +75,36 @@ export async function convertToPdf(filePath: string, mimeType: string): Promise<
       }
     }
 
-    // Secondary: libreoffice-convert buffer conversion
+    // Secondary: Try LibreOffice CLI via auto-detected binary path
     try {
-      const docBuffer = await fs.readFile(absoluteInputPath);
-      const pdfBuffer = await libreConvert(docBuffer, '.pdf', undefined);
-      await fs.writeFile(pdfPath, pdfBuffer);
-      console.log(`[PDF Converter] Converted office doc ${absoluteInputPath} -> ${pdfPath}`);
-      return pdfPath;
-    } catch (libreErr) {
-      console.warn('[PDF Converter] libreoffice-convert buffer failed, trying CLI...', libreErr);
-      try {
+      const libreExe = await findLibreOfficeExe();
+      if (libreExe) {
         const outDir = path.dirname(absoluteInputPath);
-        await execAsync(`libreoffice --headless --convert-to pdf --outdir "${outDir}" "${absoluteInputPath}"`);
+        console.log(`[PDF Converter] Converting via LibreOffice CLI (${libreExe}): ${absoluteInputPath}`);
+        await execAsync(`${libreExe} --headless --convert-to pdf --outdir "${outDir}" "${absoluteInputPath}"`);
         const generatedPdf = absoluteInputPath.replace(/\.[^/.]+$/, '.pdf');
         const exists = await fs.stat(generatedPdf).then(() => true).catch(() => false);
         if (exists) {
           console.log(`[PDF Converter] Converted CLI office doc ${absoluteInputPath} -> ${generatedPdf}`);
           return generatedPdf;
         }
-      } catch (cliErr) {
-        console.warn('[PDF Converter] CLI libreoffice conversion unavailable:', cliErr);
       }
+    } catch (cliErr) {
+      console.warn('[PDF Converter] Detected LibreOffice CLI failed:', cliErr);
     }
 
-    // Tertiary: Fallback PDF builder from DOCX text using pdf-lib & JSZip
+    // Secondary Buffer Fallback: libreoffice-convert package
+    try {
+      const docBuffer = await fs.readFile(absoluteInputPath);
+      const pdfBuffer = await libreConvert(docBuffer, '.pdf', undefined);
+      await fs.writeFile(pdfPath, pdfBuffer);
+      console.log(`[PDF Converter] Converted office doc via libreoffice-convert ${absoluteInputPath} -> ${pdfPath}`);
+      return pdfPath;
+    } catch (libreErr) {
+      console.warn('[PDF Converter] libreoffice-convert buffer failed:', libreErr);
+    }
+
+    // Tertiary: Fallback PDF builder from DOCX text & embedded images using pdf-lib & JSZip
     if (ext === '.docx' || mimeType.includes('wordprocessingml')) {
       const fallbackPdf = await createFallbackPdfFromDocx(absoluteInputPath, pdfPath);
       if (fallbackPdf && fallbackPdf !== absoluteInputPath) {
@@ -111,20 +117,81 @@ export async function convertToPdf(filePath: string, mimeType: string): Promise<
 }
 
 /**
- * Fallback PDF creator using JSZip text extraction and pdf-lib layout rendering
+ * Auto-detect LibreOffice / soffice binary across OS paths
+ */
+async function findLibreOfficeExe(): Promise<string | null> {
+  const candidates = [
+    'libreoffice',
+    'soffice',
+    'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+    'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+    '/usr/bin/libreoffice',
+    '/usr/bin/soffice',
+    '/usr/local/bin/soffice',
+    '/Applications/LibreOffice.app/Contents/MacOS/soffice',
+  ];
+
+  for (const bin of candidates) {
+    try {
+      const isCmd = bin.includes('\\') || bin.includes('/') ? `"${bin}"` : bin;
+      await execAsync(`${isCmd} --version`);
+      return isCmd;
+    } catch (_) {
+      // ignore
+    }
+  }
+  return null;
+}
+
+/**
+ * Fallback PDF creator using JSZip text/image extraction and pdf-lib layout rendering
  */
 async function createFallbackPdfFromDocx(inputPath: string, outputPath: string): Promise<string> {
   try {
     const data = await fs.readFile(inputPath);
     const zip = await JSZip.loadAsync(data);
-    const docXml = await zip.file('word/document.xml')?.async('string');
 
+    const pdfDoc = await PDFDocument.create();
+    let page = pdfDoc.addPage([595.28, 841.89]);
+    const { width, height } = page.getSize();
+    const margin = 50;
+    let y = height - margin;
+
+    // 1. Embed images from word/media/ folder inside DOCX
+    const imageFiles = Object.keys(zip.files).filter((name) => name.startsWith('word/media/'));
+    const embeddedImages: any[] = [];
+
+    for (const imgName of imageFiles) {
+      try {
+        const imgBuffer = await zip.files[imgName].async('nodebuffer');
+        let pdfImg;
+        if (imgName.toLowerCase().endsWith('.png')) {
+          pdfImg = await pdfDoc.embedPng(imgBuffer);
+        } else if (imgName.toLowerCase().endsWith('.jpg') || imgName.toLowerCase().endsWith('.jpeg')) {
+          pdfImg = await pdfDoc.embedJpg(imgBuffer);
+        }
+        if (pdfImg) {
+          embeddedImages.push(pdfImg);
+        }
+      } catch (e) {
+        console.warn(`[Fallback PDF] Could not embed image ${imgName}:`, e);
+      }
+    }
+
+    // 2. Extract paragraphs & text from word/document.xml
+    const docXml = await zip.file('word/document.xml')?.async('string');
     let textLines: string[] = [];
+
     if (docXml) {
-      const matches = docXml.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
-      if (matches) {
-        const fullText = matches.map((m) => m.replace(/<[^>]+>/g, '')).join(' ');
-        textLines = fullText.split(/(?<=[.!?])\s+|\n+/);
+      const paragraphs = docXml.match(/<w:p[^>]*>[\s\S]*?<\/w:p>/g) || [];
+      for (const p of paragraphs) {
+        const tMatches = p.match(/<w:t[^>]*>(.*?)<\/w:t>/g);
+        if (tMatches) {
+          const pText = tMatches.map((m) => m.replace(/<[^>]+>/g, '')).join('');
+          if (pText.trim()) {
+            textLines.push(pText.trim());
+          }
+        }
       }
     }
 
@@ -132,20 +199,15 @@ async function createFallbackPdfFromDocx(inputPath: string, outputPath: string):
       textLines = ['[Document Content]'];
     }
 
-    const pdfDoc = await PDFDocument.create();
-    let page = pdfDoc.addPage([595.28, 841.89]);
-    const { height } = page.getSize();
-    const margin = 50;
-    let y = height - margin;
     const fontSize = 11;
     const lineHeight = 16;
 
     for (const line of textLines) {
-      const cleanLine = line.replace(/[^\x20-\x7E]/g, ' ').trim();
+      const cleanLine = line.replace(/[^\x20-\x7E\u00A0-\u024F]/g, ' ').trim();
       if (!cleanLine) continue;
 
-      for (let i = 0; i < cleanLine.length; i += 80) {
-        const chunk = cleanLine.substring(i, i + 80);
+      for (let i = 0; i < cleanLine.length; i += 75) {
+        const chunk = cleanLine.substring(i, i + 75);
         if (y < margin + fontSize) {
           page = pdfDoc.addPage([595.28, 841.89]);
           y = height - margin;
@@ -157,11 +219,34 @@ async function createFallbackPdfFromDocx(inputPath: string, outputPath: string):
         });
         y -= lineHeight;
       }
+      y -= 4; // Paragraph spacing
+    }
+
+    // 3. Draw embedded document images
+    for (const img of embeddedImages) {
+      const maxW = width - margin * 2;
+      const scale = Math.min(maxW / img.width, 300 / img.height, 1);
+      const imgW = img.width * scale;
+      const imgH = img.height * scale;
+
+      if (y - imgH < margin) {
+        page = pdfDoc.addPage([595.28, 841.89]);
+        y = height - margin;
+      }
+
+      y -= imgH;
+      page.drawImage(img, {
+        x: margin,
+        y,
+        width: imgW,
+        height: imgH,
+      });
+      y -= 16;
     }
 
     const pdfBytes = await pdfDoc.save();
     await fs.writeFile(outputPath, pdfBytes);
-    console.log(`[PDF Converter] Created fallback PDF from DOCX: ${outputPath}`);
+    console.log(`[PDF Converter] Created fallback PDF with images/text from DOCX: ${outputPath}`);
     return outputPath;
   } catch (err) {
     console.warn('[PDF Converter] Fallback PDF generation warning:', err);
