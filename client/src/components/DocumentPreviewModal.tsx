@@ -142,7 +142,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     : null;
 
   const isShowingPdf = !!effectivePdfUrl || (isPdf && !!activeUrl);
-  const isShowingDocx = isDocx && !effectivePdfUrl;
+  const isShowingDocx = isDocx && !effectivePdfUrl && useOfficeEngine;
 
   // On-demand convert to PDF for pixel-perfect preview (watermarks, boxes, etc.)
   const convertAndPreview = async () => {
