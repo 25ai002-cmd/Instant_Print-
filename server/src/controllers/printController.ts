@@ -4,10 +4,12 @@
 // Triggers automatic session cleanup after completion.
 // ============================================================
 
+import path from 'path';
 import type { Request, Response } from 'express';
 import { sessionService } from '../services/sessionService.js';
 import { submitPrintJob, getJobStatus, cancelJob } from '../services/printerService.js';
 import { convertToPdf, deleteSessionFiles } from '../services/fileService.js';
+import { notifyMachineNewJob } from '../services/socketService.js';
 import { prisma } from '../db/prisma.js';
 import type { ApiResponse } from '../types/index.js';
 
@@ -81,6 +83,24 @@ export async function startPrint(req: Request, res: Response): Promise<void> {
     sessionService.update(sessionId, {
       status: 'printing',
       printJob: lastPrintJob,
+    });
+
+    // Notify connected Kiosk Hardware Agent over WebSocket
+    const publicUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
+    const fileBasename = path.basename(lastPrintJob?.filePath || session.filePath || '');
+    const fileUrl = `${publicUrl}/uploads/${sessionId}/${fileBasename}`;
+
+    notifyMachineNewJob('ATM001', {
+      jobId: lastPrintJob.jobId,
+      jobCode: lastPrintJob.jobId.slice(0, 8).toUpperCase(),
+      fileUrl,
+      filePath: lastPrintJob.filePath,
+      fileName: session.fileName ?? 'document.pdf',
+      copies: session.settings.copies,
+      sides: session.settings.sides,
+      colorMode: session.settings.colorMode,
+      paperSize: session.settings.paperSize,
+      pageRanges: session.settings.pageRanges,
     });
 
     const response: ApiResponse = {

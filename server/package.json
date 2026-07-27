@@ -7,6 +7,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "agent": "tsx src/kioskAgent.ts",
     "build": "tsc",
     "start": "npx prisma db push && node dist/index.js"
   },
@@ -22,6 +23,7 @@
     "jszip": "^3.10.1",
     "libreoffice-convert": "^1.8.2",
     "multer": "^1.4.5-lts.1",
+    "node-fetch": "^3.3.2",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "pdf-to-printer": "^5.8.0",
