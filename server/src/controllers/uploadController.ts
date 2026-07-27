@@ -11,6 +11,7 @@ import { prisma } from '../db/prisma.js';
 import { sessionService } from '../services/sessionService.js';
 import {
   analyzeDocument,
+  convertToPdf,
   deleteSessionFiles,
   validateFileMagicBytes,
 } from '../services/fileService.js';
@@ -79,22 +80,29 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Analyze document immediately (no slow conversion at upload time)
+    // Convert document to PDF immediately at upload time (like iLovePDF)
     try {
-      const analysis = await analyzeDocument(file.path, file.mimetype);
-      const docItem = {
+      console.log(`[Upload] Converting "${file.originalname}" to PDF immediately...`);
+      const effectivePdfPath = await convertToPdf(file.path, file.mimetype);
+      const pdfFileName = path.basename(effectivePdfPath);
+      const pdfUrl = `/uploads/${sessionId}/${pdfFileName}`;
+
+      // Analyze the converted PDF document
+      const analysis = await analyzeDocument(effectivePdfPath, 'application/pdf');
+
+      const docItem: UploadedFile = {
         id: crypto.randomUUID(),
-        filePath: file.path,
-        url: `/uploads/${sessionId}/${path.basename(file.path)}`,
+        filePath: effectivePdfPath,
+        url: pdfUrl,
         fileName: file.originalname,
         fileSize: file.size,
-        mimeType: file.mimetype,
+        mimeType: 'application/pdf',
         pageCount: analysis.pageCount,
         colorPages: analysis.colorPages,
         bwPages: analysis.bwPages,
         orientation: analysis.orientation,
         paperSize: analysis.paperSize,
-        isEstimate: analysis.isEstimate,
+        isEstimate: false,
       };
 
       newUploadedFiles.push(docItem);
@@ -107,27 +115,27 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
             sessionId,
             fileName: file.originalname,
             fileSize: file.size,
-            mimeType: file.mimetype,
-            filePath: file.path,
+            mimeType: 'application/pdf',
+            filePath: effectivePdfPath,
             pageCount: analysis.pageCount,
             colorPages: analysis.colorPages,
             bwPages: analysis.bwPages,
             orientation: analysis.orientation,
             paperSize: analysis.paperSize,
-            isEstimate: analysis.isEstimate,
+            isEstimate: false,
           },
         });
-        console.log(`[Upload] Document persisted to database: "${file.originalname}" (Session: ${sessionId})`);
+        console.log(`[Upload] Converted PDF document persisted to database: "${file.originalname}" -> ${pdfFileName} (Session: ${sessionId})`);
       } catch (dbErr) {
         console.warn('[Upload] Database document log notice:', dbErr);
       }
     } catch (err) {
-      console.error(`Failed to analyze file ${file.originalname}`, err);
+      console.error(`Failed to convert/analyze file ${file.originalname}`, err);
       const response: ApiResponse = {
         success: false,
         error: {
           code: 'ANALYSIS_FAILED',
-          message: `Could not analyze uploaded document: ${file.originalname}`,
+          message: `Could not process uploaded document: ${file.originalname}`,
         },
       };
       res.status(422).json(response);
