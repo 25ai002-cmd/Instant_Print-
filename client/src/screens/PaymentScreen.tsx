@@ -165,29 +165,167 @@ export const PaymentScreen: React.FC = () => {
         </span>
       </div>
 
-      {/* QR Code Section */}
-      <div style={{ marginBottom: '16px' }}>
-        {paymentInfo.upiString ? (
-          <QRCodeDisplay
-            value={paymentInfo.upiString}
-            size={180}
-            label={`Scan to pay ₹${priceBreakdown.total.toFixed(2)}`}
-          />
-        ) : (
-          <div style={{
-            width: '180px',
-            height: '180px',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#f8fafc',
-          }}>
-            <Loader2 className="animate-spin" size={28} color="var(--primary)" />
-          </div>
-        )}
+      {/* UPI App Quick Selection Grid (For Mobile Users) */}
+      <div style={{
+        width: '100%',
+        maxWidth: '340px',
+        marginBottom: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+      }}>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '2px' }}>
+          Select your UPI Payment App
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '10px',
+        }}>
+          {/* PhonePe */}
+          <button
+            onClick={() => {
+              if (paymentInfo?.upiString) {
+                window.location.href = paymentInfo.upiString.replace(/^upi:\/\//, 'phonepe://');
+              } else {
+                handlePayNow();
+              }
+            }}
+            disabled={paymentVerifying}
+            style={{
+              padding: '12px 10px',
+              borderRadius: '12px',
+              border: '1.5px solid #5f259f',
+              backgroundColor: '#5f259f10',
+              color: '#5f259f',
+              fontWeight: 700,
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>🟣</span> PhonePe
+          </button>
+
+          {/* Google Pay */}
+          <button
+            onClick={() => {
+              if (paymentInfo?.upiString) {
+                window.location.href = paymentInfo.upiString.replace(/^upi:\/\//, 'tez://upi/');
+              } else {
+                handlePayNow();
+              }
+            }}
+            disabled={paymentVerifying}
+            style={{
+              padding: '12px 10px',
+              borderRadius: '12px',
+              border: '1.5px solid #4285F4',
+              backgroundColor: '#4285F410',
+              color: '#1a73e8',
+              fontWeight: 700,
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>🔵</span> Google Pay
+          </button>
+
+          {/* Paytm */}
+          <button
+            onClick={() => {
+              if (paymentInfo?.upiString) {
+                window.location.href = paymentInfo.upiString.replace(/^upi:\/\//, 'paytmmp://');
+              } else {
+                handlePayNow();
+              }
+            }}
+            disabled={paymentVerifying}
+            style={{
+              padding: '12px 10px',
+              borderRadius: '12px',
+              border: '1.5px solid #00baf2',
+              backgroundColor: '#00baf210',
+              color: '#0084b4',
+              fontWeight: 700,
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>🔷</span> Paytm
+          </button>
+
+          {/* FamPay */}
+          <button
+            onClick={() => {
+              if (paymentInfo?.upiString) {
+                window.location.href = paymentInfo.upiString;
+              } else {
+                handlePayNow();
+              }
+            }}
+            disabled={paymentVerifying}
+            style={{
+              padding: '12px 10px',
+              borderRadius: '12px',
+              border: '1.5px solid #ffaa00',
+              backgroundColor: '#ffaa0010',
+              color: '#d97706',
+              fontWeight: 700,
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>🟡</span> FamPay / Any UPI
+          </button>
+        </div>
       </div>
+
+      {/* QR Code Section (Collapsible / Alternative) */}
+      <details style={{ marginBottom: '16px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
+        <summary style={{ fontSize: '12px', color: 'var(--text-tertiary)', cursor: 'pointer', marginBottom: '8px' }}>
+          Or show QR code to scan with another phone
+        </summary>
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
+          {paymentInfo.upiString ? (
+            <QRCodeDisplay
+              value={paymentInfo.upiString}
+              size={160}
+              label={`Scan to pay ₹${priceBreakdown.total.toFixed(2)}`}
+            />
+          ) : (
+            <div style={{
+              width: '160px',
+              height: '160px',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#f8fafc',
+            }}>
+              <Loader2 className="animate-spin" size={28} color="var(--primary)" />
+            </div>
+          )}
+        </div>
+      </details>
 
       {/* Security Badge */}
       <div style={{
@@ -228,9 +366,15 @@ export const PaymentScreen: React.FC = () => {
         flexDirection: 'column',
         gap: '10px',
       }}>
-        {/* Main Pay & Print Action */}
+        {/* Main Direct Pay & Print Action */}
         <button
-          onClick={handlePayNow}
+          onClick={() => {
+            if (paymentInfo?.upiString) {
+              window.location.href = paymentInfo.upiString;
+            } else {
+              handlePayNow();
+            }
+          }}
           disabled={paymentVerifying}
           className="btn btn-primary"
           style={{
@@ -245,7 +389,7 @@ export const PaymentScreen: React.FC = () => {
         >
           {paymentVerifying ? (
             <>
-              <Loader2 className="animate-spin" size={20} /> Processing &amp; Sending to Printer...
+              <Loader2 className="animate-spin" size={20} /> Processing &amp; Printing...
             </>
           ) : (
             <>
