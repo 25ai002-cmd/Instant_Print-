@@ -51,16 +51,27 @@ app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 // Serve temporary uploads directory statically with explicit CORS & framing headers
-const uploadsStaticPath = path.resolve(process.env.UPLOAD_DIR || './uploads');
+const envUploadDir = process.env.UPLOAD_DIR || './uploads';
+const uploadsStaticPath = path.isAbsolute(envUploadDir) 
+  ? envUploadDir 
+  : path.resolve(process.cwd(), envUploadDir);
+
 app.use(
   '/uploads',
   (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Content-Disposition', 'inline');
     next();
   },
-  express.static(uploadsStaticPath)
+  express.static(uploadsStaticPath, {
+    setHeaders: (res) => {
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  })
 );
 
 // Request Logger

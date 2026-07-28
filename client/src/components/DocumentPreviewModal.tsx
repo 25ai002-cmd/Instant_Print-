@@ -107,18 +107,22 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   }, [isOpen, files, initialFileIndex]);
 
   const activeFile = files[selectedFileIdx] || files[0];
-  let activeUrl = objectUrls[selectedFileIdx] || activeFile?.previewUrl || activeFile?.url || '';
+  const rawActiveUrl = objectUrls[selectedFileIdx] || activeFile?.previewUrl || activeFile?.url || '';
 
-  // Keep /uploads paths as relative URLs so Vite's proxy handles them.
-  // Only resolve to absolute if we have an explicit external VITE_API_URL env var.
-  if (activeUrl && !activeUrl.startsWith('blob:') && !activeUrl.startsWith('http://') && !activeUrl.startsWith('https://')) {
-    const externalApiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
-    if (externalApiUrl) {
-      const cleanedBase = externalApiUrl.replace(/\/api\/?$/, '');
-      activeUrl = `${cleanedBase}${activeUrl.startsWith('/') ? '' : '/'}${activeUrl}`;
+  const resolveFullUrl = (rawUrl: string | undefined): string => {
+    if (!rawUrl) return '';
+    if (rawUrl.startsWith('blob:') || rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return rawUrl;
     }
-    // else: leave as relative path (e.g. /uploads/...) — Vite proxy forwards to backend
-  }
+    const externalApiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+    const base = externalApiUrl 
+      ? externalApiUrl.replace(/\/api\/?$/, '') 
+      : (typeof window !== 'undefined' ? window.location.origin : '');
+    return `${base}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+  };
+
+  const activeUrl = resolveFullUrl(rawActiveUrl);
+  const fullActiveUrl = activeUrl;
 
   const isImg = activeFile?.mimeType?.startsWith('image/') ||
     activeFile?.fileName?.match(/\.(png|jpe?g|webp|gif|bmp)$/i);
@@ -128,18 +132,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     activeFile?.fileName?.toLowerCase().endsWith('.docx');
 
   const targetPdfUrl = convertedPdfUrl;
-
-  // Effective URL — use converted PDF URL if available (keep as relative path for Vite proxy)
-  const effectivePdfUrl = targetPdfUrl
-    ? (() => {
-        const externalBase = (import.meta as any).env?.VITE_API_URL as string | undefined;
-        if (externalBase) {
-          return `${externalBase.replace(/\/api\/?$/, '')}${targetPdfUrl}`;
-        }
-        // Relative URL — Vite proxy handles /uploads routing
-        return targetPdfUrl;
-      })()
-    : null;
+  const effectivePdfUrl = targetPdfUrl ? resolveFullUrl(targetPdfUrl) : null;
 
   const isShowingPdf = !!effectivePdfUrl || (isPdf && !!activeUrl);
   const isShowingDocx = isDocx && !effectivePdfUrl && useOfficeEngine;
