@@ -245,8 +245,8 @@ export const App: React.FC = () => {
   }
 
   const renderScreen = () => {
-    // If on Kiosk Monitor (not mobile), show KioskActiveScreen during setup steps
-    if (!isMobile && ['upload', 'analysis', 'settings'].includes(currentScreen)) {
+    // If on Kiosk Monitor (not mobile), show KioskActiveScreen during setup & payment steps
+    if (!isMobile && ['upload', 'analysis', 'settings', 'payment'].includes(currentScreen)) {
       return <KioskActiveScreen />;
     }
 
