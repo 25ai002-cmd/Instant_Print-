@@ -105,11 +105,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         fileSize: data.fileSize,
         files: data.files || null,
         analysis: data.analysis,
-        currentScreen: 'analysis',
+        currentScreen: 'settings',
         loading: false,
       });
-      // Immediately request price calculation with defaults
+      // Immediately calculate price with default settings and pre-warm payment order
       await get().updateSettingsAndCalculatePrice(DEFAULT_SETTINGS);
+      get().prewarmPayment();
     } catch (err: any) {
       set({ error: err.message, loading: false });
       throw err;

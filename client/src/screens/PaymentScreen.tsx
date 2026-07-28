@@ -4,7 +4,7 @@ import { QRCodeDisplay } from '../components/QRCodeDisplay.tsx';
 import { useCountdown } from '../hooks/useCountdown.ts';
 import { usePolling } from '../hooks/usePolling.ts';
 import { apiService } from '../services/api.js';
-import { ShieldCheck, AlertCircle, Loader2, ArrowLeft, CreditCard, CheckCircle } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Loader2, ArrowLeft, CreditCard, CheckCircle, Lock } from 'lucide-react';
 
 export const PaymentScreen: React.FC = () => {
   const {
@@ -66,6 +66,46 @@ export const PaymentScreen: React.FC = () => {
       setPaymentVerifying(false);
       setLocalError(err.message || 'Payment processing failed');
     }
+  };
+
+  /**
+   * Launch selected UPI app with pre-filled, non-editable amount (am=XX.XX)
+   */
+  const launchUpiApp = (appName: 'phonepe' | 'gpay' | 'paytm' | 'fampay' | 'generic') => {
+    if (!priceBreakdown) return;
+    const amountStr = priceBreakdown.total.toFixed(2);
+    let baseUpi = paymentInfo?.upiString || `upi://pay?pa=printatm@upi&pn=PrintATM&am=${amountStr}&cu=INR&tn=PrintATM`;
+
+    // Strictly lock amount in the UPI URI string so it cannot be modified inside UPI app
+    if (!baseUpi.includes('am=')) {
+      baseUpi += `&am=${amountStr}`;
+    } else {
+      baseUpi = baseUpi.replace(/am=[\d\.]+/, `am=${amountStr}`);
+    }
+
+    const isAndroid = /android/i.test(navigator.userAgent);
+    const rawParams = baseUpi.replace(/^upi:\/\/(pay\?)?/, '');
+
+    let finalUrl = baseUpi;
+    if (appName === 'phonepe') {
+      finalUrl = isAndroid
+        ? `intent://pay?${rawParams}#Intent;scheme=upi;package=com.phonepe.app;end`
+        : `phonepe://pay?${rawParams}`;
+    } else if (appName === 'gpay') {
+      finalUrl = isAndroid
+        ? `intent://pay?${rawParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`
+        : `tez://upi/pay?${rawParams}`;
+    } else if (appName === 'paytm') {
+      finalUrl = isAndroid
+        ? `intent://pay?${rawParams}#Intent;scheme=upi;package=net.one97.paytm;end`
+        : `paytmmp://pay?${rawParams}`;
+    } else if (appName === 'fampay') {
+      finalUrl = isAndroid
+        ? `intent://pay?${rawParams}#Intent;scheme=upi;package=com.fampay.in;end`
+        : `fampay://pay?${rawParams}`;
+    }
+
+    window.location.href = finalUrl;
   };
 
   if (!paymentInfo || !priceBreakdown) {
@@ -144,7 +184,7 @@ export const PaymentScreen: React.FC = () => {
         </p>
       </div>
 
-      {/* Amount Card */}
+      {/* Amount Card with Lock Badge */}
       <div style={{
         width: '100%',
         maxWidth: '340px',
@@ -154,15 +194,33 @@ export const PaymentScreen: React.FC = () => {
         borderRadius: 'var(--radius-md)',
         marginBottom: '18px',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        flexDirection: 'column',
+        gap: '6px',
       }}>
-        <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>
-          Total Print Cost
-        </span>
-        <span style={{ fontSize: '24px', fontWeight: 900, color: 'var(--primary)', fontFamily: 'var(--font-heading)' }}>
-          ₹{priceBreakdown.total.toFixed(2)}
-        </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>
+            Total Print Cost
+          </span>
+          <span style={{ fontSize: '26px', fontWeight: 900, color: 'var(--primary)', fontFamily: 'var(--font-heading)' }}>
+            ₹{priceBreakdown.total.toFixed(2)}
+          </span>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '11px',
+          fontWeight: 700,
+          color: '#1e40af',
+          backgroundColor: '#dbeafe',
+          padding: '4px 8px',
+          borderRadius: '6px',
+          alignSelf: 'flex-start',
+        }}>
+          <Lock size={12} />
+          <span>Locked Amount: ₹{priceBreakdown.total.toFixed(2)} (Pre-set & non-editable)</span>
+        </div>
       </div>
 
       {/* UPI App Quick Selection Grid (For Mobile Users) */}
@@ -185,13 +243,7 @@ export const PaymentScreen: React.FC = () => {
         }}>
           {/* PhonePe */}
           <button
-            onClick={() => {
-              if (paymentInfo?.upiString) {
-                window.location.href = paymentInfo.upiString.replace(/^upi:\/\//, 'phonepe://');
-              } else {
-                handlePayNow();
-              }
-            }}
+            onClick={() => launchUpiApp('phonepe')}
             disabled={paymentVerifying}
             style={{
               padding: '12px 10px',
@@ -206,7 +258,6 @@ export const PaymentScreen: React.FC = () => {
               justifyContent: 'center',
               gap: '8px',
               cursor: 'pointer',
-              transition: 'transform 0.15s ease',
             }}
           >
             <span style={{ fontSize: '16px' }}>🟣</span> PhonePe
@@ -214,13 +265,7 @@ export const PaymentScreen: React.FC = () => {
 
           {/* Google Pay */}
           <button
-            onClick={() => {
-              if (paymentInfo?.upiString) {
-                window.location.href = paymentInfo.upiString.replace(/^upi:\/\//, 'tez://upi/');
-              } else {
-                handlePayNow();
-              }
-            }}
+            onClick={() => launchUpiApp('gpay')}
             disabled={paymentVerifying}
             style={{
               padding: '12px 10px',
@@ -242,13 +287,7 @@ export const PaymentScreen: React.FC = () => {
 
           {/* Paytm */}
           <button
-            onClick={() => {
-              if (paymentInfo?.upiString) {
-                window.location.href = paymentInfo.upiString.replace(/^upi:\/\//, 'paytmmp://');
-              } else {
-                handlePayNow();
-              }
-            }}
+            onClick={() => launchUpiApp('paytm')}
             disabled={paymentVerifying}
             style={{
               padding: '12px 10px',
@@ -270,13 +309,7 @@ export const PaymentScreen: React.FC = () => {
 
           {/* FamPay */}
           <button
-            onClick={() => {
-              if (paymentInfo?.upiString) {
-                window.location.href = paymentInfo.upiString;
-              } else {
-                handlePayNow();
-              }
-            }}
+            onClick={() => launchUpiApp('fampay')}
             disabled={paymentVerifying}
             style={{
               padding: '12px 10px',

@@ -48,7 +48,7 @@ export const UploadScreen: React.FC<UploadScreenProps> = ({ isMobile = false, on
     return null;
   };
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     setLocalError(null);
     if (!files || files.length === 0) return;
 
@@ -64,6 +64,13 @@ export const UploadScreen: React.FC<UploadScreenProps> = ({ isMobile = false, on
     }
 
     setSelectedFiles((prev) => [...prev, ...validNewFiles]);
+
+    // Fast Flow: Auto-upload immediately upon file selection to save user clicks
+    try {
+      await uploadFile(validNewFiles);
+    } catch (e: any) {
+      console.error('Auto upload failed', e);
+    }
   };
 
   const removeFile = (index: number) => {

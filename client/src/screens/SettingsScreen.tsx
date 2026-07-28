@@ -123,7 +123,7 @@ export const SettingsScreen: React.FC = () => {
         marginBottom: '20px',
       }}>
         <button
-          onClick={() => setScreen('analysis')}
+          onClick={() => setScreen('upload')}
           style={{
             background: 'none',
             border: 'none',
