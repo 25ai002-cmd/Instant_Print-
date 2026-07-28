@@ -63,12 +63,16 @@ export const PaymentScreen: React.FC = () => {
     if (!sessionId || !priceBreakdown) return;
 
     const amountStr = priceBreakdown.total.toFixed(2);
-    let baseUpi = paymentInfo?.upiString || `upi://pay?pa=6353874452@fam&pn=PrintATM&am=${amountStr}&cu=INR&tn=PrintATM`;
+    let baseUpi = paymentInfo?.upiString || `upi://pay?pa=6353874452@fam&pn=PrintATM&am=${amountStr}&cu=INR&tn=PrintATM&mode=02&purpose=00`;
 
     if (!baseUpi.includes('am=')) {
       baseUpi += `&am=${amountStr}`;
     } else {
       baseUpi = baseUpi.replace(/am=[\d\.]+/, `am=${amountStr}`);
+    }
+
+    if (!baseUpi.includes('mode=')) {
+      baseUpi += `&mode=02&purpose=00`;
     }
 
     const isAndroid = /android/i.test(navigator.userAgent);
@@ -509,6 +513,15 @@ export const PaymentScreen: React.FC = () => {
               </div>
             </button>
           </div>
+          <p style={{
+            fontSize: '11px',
+            color: '#a1a1aa',
+            marginTop: '10px',
+            textAlign: 'center',
+            lineHeight: 1.3,
+          }}>
+            💡 <strong>Tip:</strong> If PhonePe shows a gallery notice, tap <span style={{ color: '#c084fc', fontWeight: 700 }}>"DISMISS"</span> to proceed and enter your UPI PIN.
+          </p>
         </div>
 
         {/* Collapsible QR Code Section */}

@@ -111,5 +111,5 @@ function buildUpiString(amountInr: number, orderId: string): string {
   const name = encodeURIComponent(process.env.UPI_MERCHANT_NAME ?? 'PrintATM');
   const amount = amountInr.toFixed(2);
   const note = encodeURIComponent(`PrintATM-${orderId.substring(0, 10)}`);
-  return `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&cu=INR&tn=${note}`;
+  return `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&cu=INR&tn=${note}&mode=02&purpose=00`;
 }
