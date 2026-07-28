@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSessionStore } from '../store/sessionStore.ts';
-import { Smartphone, FileText, CheckCircle2, ShieldCheck, RefreshCw, XCircle } from 'lucide-react';
+import { QRCodeDisplay } from '../components/QRCodeDisplay.tsx';
+import { Smartphone, FileText, CheckCircle2, ShieldCheck, RefreshCw, XCircle, CreditCard } from 'lucide-react';
 
 export const KioskActiveScreen: React.FC = () => {
   const {
@@ -8,6 +9,8 @@ export const KioskActiveScreen: React.FC = () => {
     fileName,
     fileSize,
     analysis,
+    paymentInfo,
+    priceBreakdown,
     cancelSession,
   } = useSessionStore();
 
@@ -138,6 +141,37 @@ export const KioskActiveScreen: React.FC = () => {
               </span>
             </div>
             <CheckCircle2 size={18} color="var(--success)" />
+          </div>
+        )}
+
+        {/* Payment QR Code Displayed on Machine Screen during Payment Phase */}
+        {currentScreen === 'payment' && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+            paddingTop: '12px',
+            borderTop: '1px solid var(--border)',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--primary)',
+              fontSize: '15px',
+              fontWeight: 800,
+            }}>
+              <CreditCard size={18} />
+              <span>Scan to Pay ₹{(priceBreakdown?.total || 0).toFixed(2)}</span>
+            </div>
+
+            <QRCodeDisplay
+              value={paymentInfo?.upiString || `upi://pay?pa=6353874452@fam&pn=PrintATM&am=${(priceBreakdown?.total || 0).toFixed(2)}&cu=INR&tn=PrintATM`}
+              size={210}
+              label={`Pay ₹${(priceBreakdown?.total || 0).toFixed(2)} with any UPI app`}
+              darkTheme={false}
+            />
           </div>
         )}
       </div>
