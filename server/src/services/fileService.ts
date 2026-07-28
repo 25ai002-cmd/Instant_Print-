@@ -441,19 +441,54 @@ export async function analyzeDocument(
   filePath: string,
   mimeType: string
 ): Promise<DocumentAnalysis> {
-  switch (mimeType) {
-    case 'application/pdf':
-      return analyzePdf(filePath);
-    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-    case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
-      return analyzeOfficeDoc(filePath, mimeType);
-    case 'image/png':
-    case 'image/jpeg':
-    case 'image/jpg':
-      return analyzeImage();
-    default:
-      throw new Error(`Unsupported MIME type: ${mimeType}`);
+  const ext = path.extname(filePath).toLowerCase();
+  const canonicalMime = EXT_TO_MIME[ext] || mimeType;
+
+  // 1. PDF Files
+  if (ext === '.pdf' || canonicalMime === 'application/pdf' || mimeType.includes('pdf')) {
+    try {
+      return await analyzePdf(filePath);
+    } catch (err) {
+      console.warn('[FileService] pdf-parse failed, falling back to 1 page:', err);
+      return {
+        pageCount: 1,
+        colorPages: 0,
+        bwPages: 1,
+        orientation: 'portrait',
+        paperSize: 'A4',
+        isEstimate: true,
+      };
+    }
   }
+
+  // 2. Office Documents (.docx, .pptx, .doc, .ppt)
+  if (
+    ['.docx', '.pptx', '.doc', '.ppt'].includes(ext) ||
+    canonicalMime.includes('officedocument') ||
+    mimeType.includes('msword') ||
+    mimeType.includes('officedocument')
+  ) {
+    return analyzeOfficeDoc(filePath, canonicalMime);
+  }
+
+  // 3. Images (.png, .jpg, .jpeg, .webp, .bmp, .heic, .gif)
+  if (
+    ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.heic', '.gif'].includes(ext) ||
+    mimeType.startsWith('image/')
+  ) {
+    return analyzeImage();
+  }
+
+  // 4. Universal Fallback: treat unknown documents as 1 page estimate instead of crashing
+  console.warn(`[FileService] Unknown MIME/ext "${mimeType}" / "${ext}", using single page fallback`);
+  return {
+    pageCount: 1,
+    colorPages: 0,
+    bwPages: 1,
+    orientation: 'portrait',
+    paperSize: 'A4',
+    isEstimate: true,
+  };
 }
 
 /**

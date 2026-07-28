@@ -81,60 +81,61 @@ export async function uploadFile(req: Request, res: Response): Promise<void> {
     }
 
     // Fast instant document analysis at upload time (<100ms)
+    let analysis: DocumentAnalysis;
     try {
-      const analysis = await analyzeDocument(file.path, file.mimetype);
-      const originalUrl = `/uploads/${sessionId}/${path.basename(file.path)}`;
-
-      const docItem: UploadedFile = {
-        id: crypto.randomUUID(),
-        filePath: file.path,
-        url: originalUrl,
-        fileName: file.originalname,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        pageCount: analysis.pageCount,
-        colorPages: analysis.colorPages,
-        bwPages: analysis.bwPages,
-        orientation: analysis.orientation,
-        paperSize: analysis.paperSize,
-        isEstimate: analysis.isEstimate,
-      };
-
-      newUploadedFiles.push(docItem);
-
-      // Persist document record into Database
-      try {
-        await prisma.sessionDocument.create({
-          data: {
-            id: docItem.id,
-            sessionId,
-            fileName: file.originalname,
-            fileSize: file.size,
-            mimeType: file.mimetype,
-            filePath: file.path,
-            pageCount: analysis.pageCount,
-            colorPages: analysis.colorPages,
-            bwPages: analysis.bwPages,
-            orientation: analysis.orientation,
-            paperSize: analysis.paperSize,
-            isEstimate: analysis.isEstimate,
-          },
-        });
-        console.log(`[Upload] Document analyzed and persisted instantly: "${file.originalname}" (${file.mimetype})`);
-      } catch (dbErr) {
-        console.warn('[Upload] Database document log notice:', dbErr);
-      }
+      analysis = await analyzeDocument(file.path, file.mimetype);
     } catch (err) {
-      console.error(`Failed to convert/analyze file ${file.originalname}`, err);
-      const response: ApiResponse = {
-        success: false,
-        error: {
-          code: 'ANALYSIS_FAILED',
-          message: `Could not process uploaded document: ${file.originalname}`,
-        },
+      console.warn(`[Upload] Analysis fallback for ${file.originalname}:`, err);
+      analysis = {
+        pageCount: 1,
+        colorPages: 0,
+        bwPages: 1,
+        orientation: 'portrait',
+        paperSize: 'A4',
+        isEstimate: true,
       };
-      res.status(422).json(response);
-      return;
+    }
+
+    const originalUrl = `/uploads/${sessionId}/${path.basename(file.path)}`;
+
+    const docItem: UploadedFile = {
+      id: crypto.randomUUID(),
+      filePath: file.path,
+      url: originalUrl,
+      fileName: file.originalname,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      pageCount: analysis.pageCount,
+      colorPages: analysis.colorPages,
+      bwPages: analysis.bwPages,
+      orientation: analysis.orientation,
+      paperSize: analysis.paperSize,
+      isEstimate: analysis.isEstimate,
+    };
+
+    newUploadedFiles.push(docItem);
+
+    // Persist document record into Database
+    try {
+      await prisma.sessionDocument.create({
+        data: {
+          id: docItem.id,
+          sessionId,
+          fileName: file.originalname,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          filePath: file.path,
+          pageCount: analysis.pageCount,
+          colorPages: analysis.colorPages,
+          bwPages: analysis.bwPages,
+          orientation: analysis.orientation,
+          paperSize: analysis.paperSize,
+          isEstimate: analysis.isEstimate,
+        },
+      });
+      console.log(`[Upload] Document analyzed and persisted instantly: "${file.originalname}" (${file.mimetype})`);
+    } catch (dbErr) {
+      console.warn('[Upload] Database document log notice:', dbErr);
     }
   }
 
