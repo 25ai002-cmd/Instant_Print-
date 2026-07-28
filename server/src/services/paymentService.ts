@@ -107,7 +107,7 @@ export function verifyPaymentSignature(
  * Format: upi://pay?pa=VPA&pn=NAME&am=AMOUNT&cu=INR&tn=NOTE
  */
 function buildUpiString(amountInr: number, orderId: string): string {
-  const vpa = encodeURIComponent(process.env.UPI_VPA ?? 'merchant@upi');
+  const vpa = encodeURIComponent(process.env.UPI_VPA ?? '6353874452@fam');
   const name = encodeURIComponent(process.env.UPI_MERCHANT_NAME ?? 'PrintATM');
   const amount = amountInr.toFixed(2);
   const note = encodeURIComponent(`PrintATM-${orderId.substring(0, 10)}`);

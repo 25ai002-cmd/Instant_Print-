@@ -74,7 +74,7 @@ export const PaymentScreen: React.FC = () => {
   const launchUpiApp = (appName: 'phonepe' | 'gpay' | 'paytm' | 'fampay' | 'generic') => {
     if (!priceBreakdown) return;
     const amountStr = priceBreakdown.total.toFixed(2);
-    let baseUpi = paymentInfo?.upiString || `upi://pay?pa=printatm@upi&pn=PrintATM&am=${amountStr}&cu=INR&tn=PrintATM`;
+    let baseUpi = paymentInfo?.upiString || `upi://pay?pa=6353874452@fam&pn=PrintATM&am=${amountStr}&cu=INR&tn=PrintATM`;
 
     // Strictly lock amount in the UPI URI string so it cannot be modified inside UPI app
     if (!baseUpi.includes('am=')) {
