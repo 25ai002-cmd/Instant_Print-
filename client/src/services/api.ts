@@ -1,131 +1,120 @@
-import axios from 'axios';
-import type { ApiResponse, PrintSession, PrintSettings } from '../types/index.js';
+import axios from "axios";
+import { DbDocumentRecord, KioskSession, PriceBreakdown, PrintOptions } from "../types";
 
-const api = axios.create({
-  baseURL: '/api',
-  timeout: 600000, // 10 minutes timeout for large 300-400 page document uploads
-});
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api";
 
-export const apiService = {
-  createSession: async (): Promise<{ sessionId: string; localIp: string }> => {
-    const res = await api.post<ApiResponse<{ sessionId: string; localIp: string }>>('/sessions');
-    if (!res.data.success || !res.data.data) {
-      throw new Error(res.data.error?.message || 'Failed to create session');
-    }
-    return res.data.data;
-  },
+const client = axios.create({ baseURL: API_BASE_URL, timeout: 15000 });
 
-  /** Get full session status */
-  getSession: async (sessionId: string, isMobile = false): Promise<PrintSession> => {
-    const url = isMobile ? `/sessions/${sessionId}?isMobile=true` : `/sessions/${sessionId}`;
-    const res = await api.get<ApiResponse<PrintSession>>(url, {
-      headers: isMobile ? { 'X-Mobile-Scan': 'true' } : {},
-    });
-    if (!res.data.success || !res.data.data) {
-      throw new Error(res.data.error?.message || 'Failed to get session');
-    }
-    return res.data.data;
-  },
+export interface CreateSessionResponse {
+  sessionId: string;
+  mobileUrl: string;
+  qrImageDataUrl: string;
+  stage: string;
+}
 
-  /** Upload one or multiple document files to the session */
-  uploadFile: async (sessionId: string, files: File | File[]): Promise<any> => {
-    const formData = new FormData();
-    formData.append('sessionId', sessionId);
-    
-    const fileArray = Array.isArray(files) ? files : [files];
-    fileArray.forEach((file) => {
-      formData.append('files', file);
-    });
+export async function createSession(): Promise<CreateSessionResponse> {
+  const { data } = await client.post<CreateSessionResponse>("/session");
+  return data;
+}
 
-    try {
-      const res = await api.post<ApiResponse<any>>(`/upload?sessionId=${encodeURIComponent(sessionId)}`, formData, {
-        headers: {
-          'X-Session-ID': sessionId,
-        },
-      });
+export async function getSession(sessionId: string): Promise<KioskSession> {
+  const { data } = await client.get<KioskSession>(`/session/${sessionId}`);
+  return data;
+}
 
-      if (!res.data.success || !res.data.data) {
-        throw new Error(res.data.error?.message || 'File upload failed');
+export async function attachSession(sessionId: string): Promise<KioskSession> {
+  const { data } = await client.post<KioskSession>(`/session/${sessionId}/attach`);
+  return data;
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  await client.delete(`/session/${sessionId}`);
+}
+
+export async function uploadFile(
+  sessionId: string,
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<KioskSession> {
+  const form = new FormData();
+  form.append("sessionId", sessionId);
+  form.append("file", file);
+
+  const { data } = await client.post<KioskSession>("/upload", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress: (evt) => {
+      if (onProgress && evt.total) {
+        onProgress(Math.round((evt.loaded / evt.total) * 100));
       }
-      return res.data.data;
-    } catch (err: any) {
-      const apiMsg = err.response?.data?.error?.message;
-      if (apiMsg) {
-        throw new Error(apiMsg);
-      }
-      throw err;
+    },
+  });
+  return data;
+}
+
+export async function calculatePrice(
+  sessionId: string,
+  options: PrintOptions
+): Promise<{ session: KioskSession; price: PriceBreakdown }> {
+  const { data } = await client.post("/calculate-price", { sessionId, options });
+  return data;
+}
+
+export async function createPayment(
+  sessionId: string
+): Promise<{ session: KioskSession; devMode: boolean }> {
+  const { data } = await client.post("/create-payment", { sessionId });
+  return data;
+}
+
+export async function retryPayment(
+  sessionId: string
+): Promise<{ session: KioskSession; devMode: boolean }> {
+  const { data } = await client.post("/create-payment/retry", { sessionId });
+  return data;
+}
+
+export async function verifyPayment(sessionId: string): Promise<KioskSession> {
+  const { data } = await client.post<KioskSession>("/verify-payment", { sessionId });
+  return data;
+}
+
+export async function devSimulatePayment(sessionId: string, result: "PAID" | "FAILED"): Promise<void> {
+  await client.post("/dev/simulate-payment", { sessionId, result });
+}
+
+export async function startPrint(sessionId: string): Promise<KioskSession> {
+  const { data } = await client.post<KioskSession>("/start-print", { sessionId });
+  return data;
+}
+
+export async function getPrintStatus(sessionId: string) {
+  const { data } = await client.get(`/print-status`, { params: { sessionId } });
+  return data as { stage: string; printJob: KioskSession["printJob"] };
+}
+
+export async function listDbDocuments(): Promise<DbDocumentRecord[]> {
+  const { data } = await client.get<DbDocumentRecord[]>("/db/documents");
+  return data;
+}
+
+export async function getDbDocumentByCode(accessCode: string): Promise<DbDocumentRecord> {
+  const { data } = await client.get<DbDocumentRecord>(`/db/document/code/${accessCode}`);
+  return data;
+}
+
+export async function loadSessionFromCode(accessCode: string, kioskSessionId?: string): Promise<KioskSession> {
+  const { data } = await client.post<KioskSession>("/db/load-session", { accessCode, kioskSessionId });
+  return data;
+}
+
+/** Extracts a friendly message from any API error shape this backend returns. */
+export function apiErrorMessage(err: unknown, fallback = "Something went wrong. Please try again."): string {
+  if (axios.isAxiosError(err)) {
+    const message = err.response?.data?.error?.message;
+    if (typeof message === "string") return message;
+    if (err.code === "ECONNABORTED" || err.message === "Network Error") {
+      return "Lost connection to PrintATM. Please check your internet and try again.";
     }
-  },
-
-  /** Compute price based on printing preferences */
-  calculatePrice: async (
-    sessionId: string,
-    settings: PrintSettings
-  ): Promise<any> => {
-    const res = await api.post<ApiResponse<any>>('/calculate-price', {
-      sessionId,
-      ...settings,
-    });
-    if (!res.data.success || !res.data.data) {
-      throw new Error(res.data.error?.message || 'Price calculation failed');
-    }
-    return res.data.data;
-  },
-
-  /** Request payment order with UPI QR string */
-  createPayment: async (sessionId: string): Promise<any> => {
-    const res = await api.post<ApiResponse<any>>('/create-payment', { sessionId });
-    if (!res.data.success || !res.data.data) {
-      throw new Error(res.data.error?.message || 'Failed to create payment order');
-    }
-    return res.data.data;
-  },
-
-  /** Verify backend signature */
-  verifyPayment: async (
-    sessionId: string,
-    orderId: string,
-    paymentId: string,
-    signature: string
-  ): Promise<boolean> => {
-    const res = await api.post<ApiResponse<any>>('/verify-payment', {
-      sessionId,
-      razorpayOrderId: orderId,
-      razorpayPaymentId: paymentId,
-      razorpaySignature: signature,
-    });
-    return !!res.data.success;
-  },
-
-  /** Trigger print job submission */
-  startPrint: async (sessionId: string): Promise<any> => {
-    const res = await api.post<ApiResponse<any>>('/print', { sessionId });
-    if (!res.data.success || !res.data.data) {
-      throw new Error(res.data.error?.message || 'Failed to start printing');
-    }
-    return res.data.data;
-  },
-
-  /** Get progress of print job */
-  getPrintStatus: async (sessionId: string): Promise<any> => {
-    const res = await api.get<ApiResponse<any>>(`/print-status?sessionId=${sessionId}`);
-    if (!res.data.success || !res.data.data) {
-      throw new Error(res.data.error?.message || 'Failed to poll print status');
-    }
-    return res.data.data;
-  },
-
-  /** Clean session directories explicitly */
-  deleteSession: async (sessionId: string): Promise<void> => {
-    await api.delete(`/sessions/${sessionId}`);
-  },
-
-  /** On-demand DOCX/PPTX → PDF conversion for preview */
-  convertPreview: async (sessionId: string, fileId: string): Promise<{ pdfUrl: string | null; fallback?: boolean }> => {
-    const res = await api.post<ApiResponse<{ pdfUrl: string | null; fallback?: boolean }>>('/convert-preview', { sessionId, fileId });
-    if (!res.data.success || !res.data.data) {
-      throw new Error(res.data.error?.message || 'Conversion failed');
-    }
-    return res.data.data;
-  },
-};
+  }
+  return fallback;
+}

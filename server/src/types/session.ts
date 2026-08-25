@@ -4,10 +4,10 @@ export type SidesMode = "SINGLE" | "DOUBLE";
 export type PageRangeMode = "ALL" | "CUSTOM";
 
 export type SessionStage =
-  | "CREATED"
-  | "AWAITING_UPLOAD"
-  | "FILE_UPLOADED"
-  | "AWAITING_PAYMENT"
+  | "CREATED" // kiosk generated a session, waiting for phone to attach
+  | "AWAITING_UPLOAD" // phone connected, waiting for file
+  | "FILE_UPLOADED" // file analyzed, choosing options
+  | "AWAITING_PAYMENT" // Razorpay UPI QR generated
   | "PAYMENT_FAILED"
   | "PRINTING"
   | "COMPLETED"
@@ -34,8 +34,8 @@ export interface PrintOptions {
   colorMode: ColorMode;
   sides: SidesMode;
   pageRangeMode: PageRangeMode;
-  customPageRange?: string;
-  pagesToPrint: number;
+  customPageRange?: string; // e.g. "1-3,5"
+  pagesToPrint: number; // resolved count after applying range x copies is computed separately
 }
 
 export interface PriceBreakdown {
@@ -51,7 +51,12 @@ export interface PriceBreakdown {
   currency: "INR";
 }
 
-export type PaymentStatus = "NONE" | "PENDING" | "PAID" | "FAILED" | "TIMED_OUT";
+export type PaymentStatus =
+  | "NONE"
+  | "PENDING"
+  | "PAID"
+  | "FAILED"
+  | "TIMED_OUT";
 
 export interface PaymentInfo {
   orderId: string;
@@ -94,26 +99,4 @@ export interface KioskSession {
   payment?: PaymentInfo;
   printJob?: PrintJobInfo;
   errorMessage?: string;
-}
-
-export interface DbDocumentRecord {
-  id: string;
-  access_code: string;
-  session_id: string;
-  original_name: string;
-  stored_path: string;
-  mime_type: string;
-  size_bytes: number;
-  page_count: number;
-  color_page_count: number;
-  bw_page_count: number;
-  blank_page_count: number;
-  orientation: string;
-  detected_paper_size: string;
-  options_json?: string;
-  price_json?: string;
-  payment_status: string;
-  print_status: string;
-  created_at: number;
-  updated_at: number;
 }

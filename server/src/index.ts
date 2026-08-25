@@ -1,123 +1,41 @@
-// ============================================================
-// PrintATM Cloud SaaS Platform — Server Entry Point
-// Sets up Express, HTTP Server, Socket.IO WebSockets, Prisma DB,
-// Helmet, CORS, session GC, and routing.
-// ============================================================
-
-import http from 'http';
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Resolve directory paths
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load environment variables immediately before services load
-dotenv.config({ path: path.join(__dirname, '../.env') });
-
-import apiRoutes from './routes/index.js';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import { sessionService } from './services/sessionService.js';
-import { initSocketService } from './services/socketService.js';
-import { seedDatabase } from './db/seed.js';
+import express from "express";
+import cors from "cors";
+import sessionRoutes from "./routes/session";
+import uploadRoutes from "./routes/upload";
+import priceRoutes from "./routes/price";
+import paymentRoutes from "./routes/payment";
+import printRoutes from "./routes/print";
+import dbRoutes from "./routes/dbRoutes";
+import { initDatabase } from "./services/database";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 
 const app = express();
-const server = http.createServer(app);
-const PORT = process.env.PORT || 3002;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const PORT = process.env.PORT ?? 4000;
 
-// Security Headers & CORS (Allow Iframe Preview & Static Upload Access)
-app.use(
-  helmet({
-    contentSecurityPolicy: false,
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-    frameguard: false,
-  })
-);
+app.use(cors());
+app.use(express.json());
 
-app.use(
-  cors({
-    origin: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true,
-  })
-);
+app.get("/health", (_req, res) => res.json({ status: "ok", service: "printatm-server" }));
 
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ limit: '500mb', extended: true }));
+app.use("/api", sessionRoutes);
+app.use("/api", uploadRoutes);
+app.use("/api", priceRoutes);
+app.use("/api", paymentRoutes);
+app.use("/api", printRoutes);
+app.use("/api", dbRoutes);
 
-// Serve temporary uploads directory statically with explicit CORS & framing headers
-const envUploadDir = process.env.UPLOAD_DIR || './uploads';
-const uploadsStaticPath = path.isAbsolute(envUploadDir) 
-  ? envUploadDir 
-  : path.resolve(process.cwd(), envUploadDir);
-
-app.use(
-  '/uploads',
-  (req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Content-Disposition', 'inline');
-    next();
-  },
-  express.static(uploadsStaticPath, {
-    setHeaders: (res) => {
-      res.setHeader('Content-Disposition', 'inline');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    },
-  })
-);
-
-// Request Logger
-app.use((req, _res, next) => {
-  console.log(`[REQ] ${req.method} ${req.url} (from ${req.ip})`);
-  next();
-});
-
-// Routes
-app.use('/api', apiRoutes);
-
-// Serve React Frontend static production bundle in production/cloud deployment
-const clientDistPath = path.join(__dirname, '../../client/dist');
-app.use(express.static(clientDistPath));
-
-app.get('*', (req, res, next) => {
-  if (
-    req.path.startsWith('/api') ||
-    req.path.startsWith('/uploads') ||
-    req.path.startsWith('/socket.io') ||
-    req.path === '/health'
-  ) {
-    return next();
-  }
-  res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
-    if (err) next();
-  });
-});
-
-// Error handling
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Initialize Socket.IO WebSockets for real-time Kiosk machine job dispatch
-initSocketService(server);
-
-// Start Session Store Garbage Collector
-sessionService.startCleanupInterval();
-
-// Seed initial Database data (Admin user, ATM001, ATM002, Rate cards)
-seedDatabase().catch((err) => console.error('[Seed Error]:', err));
-
-server.listen(PORT, () => {
-  console.log(`==============================================`);
-  console.log(` Instant Print Cloud SaaS Server is running on port ${PORT} `);
-  console.log(` Environment: ${process.env.NODE_ENV || 'development'} `);
-  console.log(` Allowed Client Origin: ${CLIENT_URL} `);
-  console.log(`==============================================`);
-});
+// Boot sequence: initialize SQLite database before opening port
+initDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      // eslint-disable-next-line no-console
+      console.log(`PrintATM server listening on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to initialize database:", err);
+    process.exit(1);
+  });

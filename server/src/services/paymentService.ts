@@ -1,115 +1,103 @@
-// ============================================================
-// PrintATM — Payment Service
-// Razorpay integration for order creation and verification.
-// In DEMO_MODE, payment can be simulated without real keys.
-// ============================================================
+import QRCode from "qrcode";
+import { v4 as uuid } from "uuid";
+import { PaymentInfo, PaymentStatus } from "../types/session";
 
-import crypto from 'crypto';
-import type { PaymentInfo } from '../types/index.js';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Razorpay = require("razorpay");
 
-/** Create a Razorpay-like order */
-export interface CreateOrderParams {
-  amount: number;   // in paise
-  currency?: string;
-  sessionId: string;
-}
+const PAYMENT_WINDOW_MS = 3 * 60 * 1000; // 3 minute UPI payment window
+const UPI_PAYEE_VPA = process.env.UPI_PAYEE_VPA ?? "printatm@upi";
+const UPI_PAYEE_NAME = process.env.UPI_PAYEE_NAME ?? "PrintATM Kiosk";
 
-/**
- * Creates a payment order via Razorpay.
- * Falls back to mock order in demo mode.
- */
-export async function createOrder(params: CreateOrderParams): Promise<PaymentInfo> {
-  const { amount, currency = 'INR', sessionId } = params;
-  const isLiveMode = process.env.ENABLE_RAZORPAY_LIVE === 'true';
-  const keyId = process.env.RAZORPAY_KEY_ID ?? '';
-  const keySecret = process.env.RAZORPAY_KEY_SECRET ?? '';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+const LIVE_MODE = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
 
-  // --- Real Razorpay Integration ---
-  if (isLiveMode && keyId && keySecret && !keyId.startsWith('rzp_test_xxx')) {
-    try {
-      // Dynamic import so the server starts even without real Razorpay keys
-      const Razorpay = (await import('razorpay')).default;
-      const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+const razorpayClient = LIVE_MODE
+  ? new Razorpay({ key_id: RAZORPAY_KEY_ID, key_secret: RAZORPAY_KEY_SECRET })
+  : null;
 
-      const order = await razorpay.orders.create({
-        amount,
-        currency,
-        receipt: `session_${sessionId.substring(0, 8)}`,
-        notes: { sessionId },
-      });
+// In simulation mode we keep status in memory keyed by orderId so /verify-payment
+// and a local dev-only "simulate" endpoint can flip it.
+const simulatedStatuses = new Map<string, PaymentStatus>();
 
-      const upiString = buildUpiString(amount / 100, String(order.id));
+export async function createPayment(sessionId: string, amount: number): Promise<PaymentInfo> {
+  const orderId = LIVE_MODE ? await createRazorpayOrder(amount) : `sim_order_${uuid()}`;
+  const upiIntentUrl = buildUpiIntentUrl(orderId, amount);
+  const qrImageDataUrl = await QRCode.toDataURL(upiIntentUrl, { margin: 1, width: 360 });
 
-      return {
-        orderId: String(order.id),
-        amount,
-        currency,
-        status: 'pending',
-        upiString,
-        createdAt: new Date(),
-      };
-    } catch (err) {
-      console.error('[PaymentService] Razorpay error:', err);
-      throw new Error('Payment gateway error. Please try again.');
-    }
+  if (!LIVE_MODE) {
+    simulatedStatuses.set(orderId, "PENDING");
   }
 
-  // --- Demo / Simulation Mode ---
-  console.log('[PaymentService] Demo mode: creating mock order');
-  const mockOrderId = `order_demo_${Date.now()}`;
-  const upiString = buildUpiString(amount / 100, mockOrderId);
-
+  const now = Date.now();
   return {
-    orderId: mockOrderId,
+    orderId,
+    qrImageDataUrl,
+    upiIntentUrl,
     amount,
-    currency,
-    status: 'pending',
-    upiString,
-    createdAt: new Date(),
+    status: "PENDING",
+    createdAt: now,
+    expiresAt: now + PAYMENT_WINDOW_MS,
   };
 }
 
-/**
- * Verify Razorpay payment signature on the backend.
- * This is the critical security step — never trust the frontend.
- */
-export function verifyPaymentSignature(
-  orderId: string,
-  paymentId: string,
-  signature: string
-): boolean {
-  const isLiveMode = process.env.ENABLE_RAZORPAY_LIVE === 'true';
-  const keySecret = process.env.RAZORPAY_KEY_SECRET ?? '';
-
-  // If not in live mode (no real Razorpay keys configured), always allow payment.
-  // This enables seamless testing and demo kiosk operation.
-  if (!isLiveMode) {
-    console.log('[PaymentService] Demo/Test mode: payment auto-approved ✓');
-    return true;
-  }
-
-  // Live mode: HMAC-SHA256 signature verification
-  if (!keySecret || keySecret.startsWith('xxxxxxxx')) {
-    console.warn('[PaymentService] Live mode enabled but no key secret configured — rejecting.');
-    return false;
-  }
-
-  const expectedSignature = crypto
-    .createHmac('sha256', keySecret)
-    .update(`${orderId}|${paymentId}`)
-    .digest('hex');
-
-  return expectedSignature === signature;
+async function createRazorpayOrder(amount: number): Promise<string> {
+  const order = await razorpayClient.orders.create({
+    amount: Math.round(amount * 100), // paise
+    currency: "INR",
+    payment_capture: 1,
+  });
+  return order.id;
 }
 
-/**
- * Build a UPI deep-link string for QR code display.
- * Format: upi://pay?pa=VPA&pn=NAME&am=AMOUNT&cu=INR&tn=NOTE
- */
-function buildUpiString(amountInr: number, orderId: string): string {
-  const vpa = encodeURIComponent(process.env.UPI_VPA ?? '6353874452@fam');
-  const name = encodeURIComponent(process.env.UPI_MERCHANT_NAME ?? 'PrintATM');
-  const amount = amountInr.toFixed(2);
-  const note = encodeURIComponent(`PrintATM-${orderId.substring(0, 10)}`);
-  return `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&cu=INR&tn=${note}&mode=02&purpose=00`;
+function buildUpiIntentUrl(orderId: string, amount: number): string {
+  const params = new URLSearchParams({
+    pa: UPI_PAYEE_VPA,
+    pn: UPI_PAYEE_NAME,
+    tr: orderId,
+    am: amount.toFixed(2),
+    cu: "INR",
+    tn: "PrintATM kiosk print job",
+  });
+  return `upi://pay?${params.toString()}`;
+}
+
+export async function checkPaymentStatus(payment: PaymentInfo): Promise<PaymentStatus> {
+  if (Date.now() > payment.expiresAt && payment.status === "PENDING") {
+    return "TIMED_OUT";
+  }
+
+  if (LIVE_MODE) {
+    // In production, Razorpay's webhook (POST /verify-payment) is the source of
+    // truth. Polling here re-checks order status server-side as a fallback in
+    // case a webhook delivery was delayed or missed.
+    const order = await razorpayClient.orders.fetch(payment.orderId);
+    if (order.status === "paid") return "PAID";
+    if (order.status === "attempted") return "PENDING";
+    return payment.status;
+  }
+
+  return simulatedStatuses.get(payment.orderId) ?? payment.status;
+}
+
+/** Dev-only helper — lets the mobile web UI's "simulate payment" button (non-production) resolve a fake order. */
+export function devSimulatePaymentResult(orderId: string, result: "PAID" | "FAILED"): void {
+  if (LIVE_MODE) return;
+  simulatedStatuses.set(orderId, result);
+}
+
+export function isLiveMode(): boolean {
+  return LIVE_MODE;
+}
+
+/** Verifies a Razorpay webhook/callback signature. Only meaningful in live mode. */
+export function verifyWebhookSignature(payload: string, signature: string): boolean {
+  if (!LIVE_MODE) return true;
+  const crypto = require("crypto");
+  const expected = crypto
+    .createHmac("sha256", RAZORPAY_KEY_SECRET)
+    .update(payload)
+    .digest("hex");
+  return expected === signature;
 }
