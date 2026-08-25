@@ -182,7 +182,7 @@ async function analyzePptx(
 
   const slideEntries = zip
     .getEntries()
-    .filter((e) => /^ppt\/slides\/slide\d+\.xml$/.test(e.entryName));
+    .filter((e: any) => /^ppt\/slides\/slide\d+\.xml$/.test(e.entryName));
 
   if (slideEntries.length === 0) {
     throw new FileValidationError("This file is not a valid PPTX presentation.");

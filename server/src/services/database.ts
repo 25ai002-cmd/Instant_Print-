@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
 import sqlite3 from "sqlite3";
-import { FileMeta, KioskSession, PaymentInfo, PrintJobInfo, PrintOptions, PriceBreakdown } from "../types/session";
+import { KioskSession, PrintOptions, PriceBreakdown } from "../types/session";
 
 const DATA_DIR = path.join(__dirname, "../../data");
 if (!fs.existsSync(DATA_DIR)) {
@@ -10,7 +10,6 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const DB_PATH = path.join(DATA_DIR, "printatm.db");
 
-// Enable verbose error messages for debugging SQLite operations if needed
 const sqlite = sqlite3.verbose();
 const db = new sqlite.Database(DB_PATH);
 
@@ -60,7 +59,7 @@ export function initDatabase(): Promise<void> {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )`,
-      (err) => {
+      (err: any) => {
         if (err) {
           console.error("[Database] Error creating uploaded_documents table:", err);
           reject(err);
@@ -73,7 +72,6 @@ export function initDatabase(): Promise<void> {
   });
 }
 
-// Generate a random 6-digit code for fast lookup
 export function generateAccessCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -139,7 +137,7 @@ export function saveDocumentRecord(session: KioskSession, accessCode: string): P
   ];
 
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
+    db.run(sql, params, function (this: any, err: any) {
       if (err) {
         console.error("[Database] Error saving document record:", err);
         reject(err);
@@ -154,7 +152,7 @@ export function getDocumentByAccessCode(accessCode: string): Promise<DbDocumentR
   const cleanCode = accessCode.replace(/\s+/g, "");
   const sql = `SELECT * FROM uploaded_documents WHERE access_code = ?`;
   return new Promise((resolve, reject) => {
-    db.get(sql, [cleanCode], (err, row) => {
+    db.get(sql, [cleanCode], (err: any, row: any) => {
       if (err) {
         reject(err);
       } else {
@@ -167,7 +165,7 @@ export function getDocumentByAccessCode(accessCode: string): Promise<DbDocumentR
 export function getDocumentById(id: string): Promise<DbDocumentRecord | undefined> {
   const sql = `SELECT * FROM uploaded_documents WHERE id = ?`;
   return new Promise((resolve, reject) => {
-    db.get(sql, [id], (err, row) => {
+    db.get(sql, [id], (err: any, row: any) => {
       if (err) {
         reject(err);
       } else {
@@ -180,7 +178,7 @@ export function getDocumentById(id: string): Promise<DbDocumentRecord | undefine
 export function listPendingDocuments(): Promise<DbDocumentRecord[]> {
   const sql = `SELECT * FROM uploaded_documents ORDER BY updated_at DESC LIMIT 50`;
   return new Promise((resolve, reject) => {
-    db.all(sql, [], (err, rows) => {
+    db.all(sql, [], (err: any, rows: any) => {
       if (err) {
         reject(err);
       } else {
@@ -227,7 +225,7 @@ export function updateDocumentStatus(
 
   const sql = `UPDATE uploaded_documents SET ${fields.join(", ")} WHERE id = ?`;
   return new Promise((resolve, reject) => {
-    db.run(sql, params, (err) => {
+    db.run(sql, params, (err: any) => {
       if (err) reject(err);
       else resolve();
     });
@@ -236,7 +234,7 @@ export function updateDocumentStatus(
 
 export function deleteDocumentRecord(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    db.run(`DELETE FROM uploaded_documents WHERE id = ?`, [id], (err) => {
+    db.run(`DELETE FROM uploaded_documents WHERE id = ?`, [id], (err: any) => {
       if (err) reject(err);
       else resolve();
     });
