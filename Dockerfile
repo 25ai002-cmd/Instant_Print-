@@ -1,6 +1,9 @@
 # Production Dockerfile for Instant Print SaaS on Render
 FROM node:20-alpine AS builder
 
+# Install build dependencies for native modules on Alpine
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
 
 # Copy root and package manifests
@@ -8,15 +11,15 @@ COPY package*.json ./
 COPY client/package*.json ./client/
 COPY server/package*.json ./server/
 
-# Install all dependencies across workspaces
+# Install dependencies across workspaces
 RUN npm install
 RUN cd client && npm install
 RUN cd server && npm install
 
-# Copy all source files
+# Copy source files
 COPY . .
 
-# Build Client production bundle, Prisma client, and Server TS
+# Build Client production bundle and Server TS
 RUN npm run build
 
 # Production runner image with LibreOffice for PDF conversion
@@ -28,7 +31,6 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=10000
-ENV DATABASE_URL="file:./dev.db"
 
 # Copy built application from builder stage
 COPY --from=builder /app /app
