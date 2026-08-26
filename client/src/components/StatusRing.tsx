@@ -23,7 +23,7 @@ export function StatusRing({ percent, size = 280, color = "#2563EB", trackColor 
   const offset = isDeterminate ? circumference * (1 - percent / 100) : 0;
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+    <div className="relative mx-auto flex items-center justify-center" style={{ width: size, height: size }}>
       {!isDeterminate && (
         <>
           <span

@@ -9,7 +9,7 @@ import { KioskSession } from "../types";
 
 const POLL_MS = 2000;
 const PRINT_POLL_MS = 1000;
-const COLLECT_COUNTDOWN_SECONDS = 5;
+const COLLECT_COUNTDOWN_SECONDS = 2;
 
 export function KioskDisplay() {
   const [session, setSession] = useState<KioskSession | null>(null);
@@ -144,9 +144,11 @@ function ContinueOnPhoneView({ stage, session }: { stage: string; session: Kiosk
   const isFailed = stage === "PAYMENT_FAILED";
   return (
     <KioskCard className="text-center">
-      <StatusRing size={220} color={isFailed ? "#DC2626" : "#2563EB"} trackColor={isFailed ? "#FEE2E2" : "#DBEAFE"}>
-        <Smartphone className={isFailed ? "text-danger" : "text-primary"} size={64} />
-      </StatusRing>
+      <div className="flex justify-center my-6">
+        <StatusRing size={220} color={isFailed ? "#DC2626" : "#2563EB"} trackColor={isFailed ? "#FEE2E2" : "#DBEAFE"}>
+          <Smartphone className={isFailed ? "text-danger" : "text-primary"} size={64} />
+        </StatusRing>
+      </div>
       <h2 className="mt-8 font-display text-3xl font-bold text-ink">
         {isFailed ? "Payment didn't go through" : "Document Uploaded Successfully"}
       </h2>
@@ -176,9 +178,11 @@ function PrintingView({ progress, session }: { progress: number; session: KioskS
 
   return (
     <KioskCard className="text-center">
-      <StatusRing percent={progress} size={280}>
-        <span className="font-display text-5xl font-extrabold text-primary">{progress}%</span>
-      </StatusRing>
+      <div className="flex justify-center my-6">
+        <StatusRing percent={progress} size={280}>
+          <span className="font-display text-5xl font-extrabold text-primary">{progress}%</span>
+        </StatusRing>
+      </div>
       <h2 className="mt-8 font-display text-3xl font-extrabold text-ink">Printing Document…</h2>
       <p className="mt-2 text-muted text-base">Spooling document to your physical printer.</p>
       
@@ -198,26 +202,18 @@ function PrintingView({ progress, session }: { progress: number; session: KioskS
 function triggerBrowserPrint(sessionId: string) {
   try {
     const previewUrl = getFilePreviewUrl(sessionId);
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.src = previewUrl;
-    document.body.appendChild(iframe);
-    
-    iframe.onload = () => {
-      setTimeout(() => {
+    // Open print preview tab that auto-triggers window.print()
+    const printWin = window.open(previewUrl, "_blank");
+    if (printWin) {
+      printWin.onload = () => {
         try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
+          printWin.focus();
+          printWin.print();
         } catch {
-          window.open(previewUrl, "_blank");
+          // fallback handled by user clicking print in new tab
         }
-      }, 400);
-    };
+      };
+    }
   } catch (err) {
     console.error("Print trigger error:", err);
   }
