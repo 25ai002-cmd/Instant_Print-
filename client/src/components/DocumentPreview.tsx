@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FileText, Maximize2, X, FileImage, Loader2, RefreshCw } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
-import { FileMeta } from "../types";
+import { ColorMode, FileMeta } from "../types";
 import { getFilePreviewUrl } from "../services/api";
 
 // Configure PDF.js worker
@@ -10,9 +10,11 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 interface DocumentPreviewProps {
   sessionId: string;
   file: FileMeta;
+  colorMode?: ColorMode;
+  selectedPagesCount?: number;
 }
 
-export function DocumentPreview({ sessionId, file }: DocumentPreviewProps) {
+export function DocumentPreview({ sessionId, file, colorMode = "BW", selectedPagesCount }: DocumentPreviewProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [pdfRenderError, setPdfRenderError] = useState(false);
@@ -176,12 +178,16 @@ export function DocumentPreview({ sessionId, file }: DocumentPreviewProps) {
         {/* Metadata Badges */}
         <div className="mt-3 grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
           <div className="bg-slate-50 rounded-lg py-1.5 px-2 border border-slate-100">
-            <span className="block text-[10px] text-muted uppercase font-bold">Total Pages</span>
-            <span className="font-display text-xs font-extrabold text-ink">{file.pageCount}</span>
+            <span className="block text-[10px] text-muted uppercase font-bold">Selected Pages</span>
+            <span className="font-display text-xs font-extrabold text-ink">
+              {selectedPagesCount !== undefined ? `${selectedPagesCount} of ${file.pageCount}` : `${file.pageCount} pgs`}
+            </span>
           </div>
           <div className="bg-slate-50 rounded-lg py-1.5 px-2 border border-slate-100">
-            <span className="block text-[10px] text-muted uppercase font-bold">Orientation</span>
-            <span className="font-display text-xs font-extrabold text-ink capitalize">{file.orientation.toLowerCase()}</span>
+            <span className="block text-[10px] text-muted uppercase font-bold">Color Mode</span>
+            <span className="font-display text-xs font-extrabold text-primary">
+              {colorMode === "COLOR" ? "Full Color" : "Black & White"}
+            </span>
           </div>
           <div className="bg-slate-50 rounded-lg py-1.5 px-2 border border-slate-100">
             <span className="block text-[10px] text-muted uppercase font-bold">File Size</span>
