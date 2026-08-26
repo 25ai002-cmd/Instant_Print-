@@ -7,7 +7,7 @@ export const API_BASE_URL =
     ? `${window.location.origin}/api`
     : "http://localhost:4000/api");
 
-const client = axios.create({ baseURL: API_BASE_URL, timeout: 15000 });
+const client = axios.create({ baseURL: API_BASE_URL, timeout: 60000 });
 
 export interface CreateSessionResponse {
   sessionId: string;
@@ -50,6 +50,7 @@ export async function uploadFile(
 
   const { data } = await client.post<KioskSession>("/upload", form, {
     headers: { "Content-Type": "multipart/form-data" },
+    timeout: 120000,
     onUploadProgress: (evt) => {
       if (onProgress && evt.total) {
         onProgress(Math.round((evt.loaded / evt.total) * 100));

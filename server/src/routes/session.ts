@@ -57,8 +57,29 @@ router.post(
     const { clientToken } = req.body as { clientToken?: string };
     const session = sessionManager.requireSession(req.params.id);
 
-    // Single-user lock check: if another device is already attached, reject extra connections
-    if (session.attachedClientToken && clientToken && session.attachedClientToken !== clientToken) {
+    // If session does not have an attached token yet, lock to this clientToken
+    if (!session.attachedClientToken) {
+      const updated = sessionManager.update(session.id, {
+        stage: "AWAITING_UPLOAD",
+        attachedClientToken: clientToken || "phone_client",
+      });
+      res.json(updated);
+      return;
+    }
+
+    // Single-user lock check: reject if another device tries to attach with a different token
+    if (clientToken && session.attachedClientToken && session.attachedClientToken !== clientToken) {
+      // Auto-unlock if previous user abandoned session for > 3 minutes
+      const idleTimeMs = Date.now() - session.updatedAt;
+      if (idleTimeMs > 3 * 60 * 1000) {
+        const updated = sessionManager.update(session.id, {
+          stage: "AWAITING_UPLOAD",
+          attachedClientToken: clientToken,
+        });
+        res.json(updated);
+        return;
+      }
+
       res.status(409).json({
         error: "Kiosk Busy: Another phone is currently connected to this PrintATM machine.",
         stage: "BUSY",
@@ -66,10 +87,9 @@ router.post(
       return;
     }
 
-    const token = clientToken || session.attachedClientToken || req.ip || "phone_client";
     const updated = sessionManager.update(session.id, {
-      stage: "AWAITING_UPLOAD",
-      attachedClientToken: token,
+      stage: session.stage === "CREATED" ? "AWAITING_UPLOAD" : session.stage,
+      attachedClientToken: clientToken || session.attachedClientToken,
     });
 
     res.json(updated);
