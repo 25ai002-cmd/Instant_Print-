@@ -106,7 +106,7 @@ export function KioskDisplay() {
           <PrintingView key="printing" progress={session?.printJob?.progressPercent ?? 0} />
         )}
 
-        {stage === "COMPLETED" && <CompleteView key="complete" countdown={countdown} />}
+        {stage === "COMPLETED" && <CompleteView key="complete" countdown={countdown} session={session} />}
 
         {stage === "ERROR" && <ErrorView key="error" />}
       </AnimatePresence>
@@ -176,17 +176,46 @@ function PrintingView({ progress }: { progress: number }) {
   );
 }
 
-function CompleteView({ countdown }: { countdown: number }) {
+function CompleteView({ countdown, session }: { countdown: number; session: KioskSession | null }) {
+  const singleRate = session?.options?.colorMode === "COLOR" ? 10.0 : 2.0;
+  const pgs = session?.options?.pagesToPrint || session?.file?.pageCount || 1;
+  const cps = session?.options?.copies || 1;
+  const total = session?.price?.total ?? (singleRate * pgs * cps);
+
   return (
     <KioskCard className="text-center">
       <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 200, damping: 14 }}>
-        <div className="mx-auto flex items-center justify-center w-28 h-28 rounded-full bg-success/10">
-          <CheckCircle2 className="text-success" size={64} />
+        <div className="mx-auto flex items-center justify-center w-20 h-20 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+          <CheckCircle2 size={48} />
         </div>
       </motion.div>
-      <h2 className="mt-8 font-display text-3xl font-bold text-ink">Printing Complete</h2>
-      <p className="mt-3 text-muted text-lg">Please collect your documents from the tray.</p>
-      <p className="mt-8 font-display text-6xl font-extrabold text-primary">{countdown}</p>
+      <h2 className="mt-6 font-display text-3xl font-extrabold text-ink">Printing Complete!</h2>
+      <p className="mt-2 text-muted text-base">Please collect your documents from the tray.</p>
+
+      {/* Itemized Calculation Summary Box */}
+      <div className="mt-6 p-4 rounded-control bg-slate-50 border border-slate-200 text-left text-xs">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-200 font-bold text-ink">
+          <span>TAX RECEIPT</span>
+          <span className="text-emerald-600">PAID ✅</span>
+        </div>
+        <div className="mt-2 flex justify-between text-slate-600 font-semibold">
+          <span>Single Page Rate:</span>
+          <span>₹{singleRate.toFixed(2)} / page</span>
+        </div>
+        <div className="mt-1 flex justify-between text-ink font-bold text-sm bg-white p-2 rounded border border-slate-200">
+          <span>Formula:</span>
+          <span className="text-primary">₹{singleRate.toFixed(2)} × {pgs} pgs × {cps} {cps === 1 ? "copy" : "copies"}</span>
+        </div>
+        <div className="mt-2 flex justify-between font-extrabold text-ink text-base pt-1">
+          <span>Total Cost:</span>
+          <span>₹{total.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div className="mt-6 flex items-center justify-center gap-2 text-sm font-semibold text-muted">
+        <span>Resetting kiosk in</span>
+        <span className="font-display text-2xl font-extrabold text-primary">{countdown}s</span>
+      </div>
     </KioskCard>
   );
 }
