@@ -81,4 +81,19 @@ router.post(
   })
 );
 
+/** Serves the uploaded document file for mobile live preview. */
+router.get(
+  "/file/:sessionId/preview",
+  asyncHandler(async (req, res) => {
+    const session = sessionManager.requireSession(req.params.sessionId);
+    if (!session.file || !fs.existsSync(session.file.storedPath)) {
+      res.status(404).send("File not found");
+      return;
+    }
+    res.setHeader("Content-Type", session.file.mimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(session.file.originalName)}"`);
+    res.sendFile(session.file.storedPath);
+  })
+);
+
 export default router;

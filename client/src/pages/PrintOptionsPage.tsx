@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, IndianRupee, Layers, Palette, FileStack, Copy } from "lucide-react";
 import { Logo } from "../components/Logo";
 import { BigButton } from "../components/BigButton";
+import { DocumentPreview } from "../components/DocumentPreview";
 import { apiErrorMessage, calculatePrice, getSession } from "../services/api";
 import { ColorMode, FileMeta, PageRangeMode, PaperSize, PriceBreakdown, SidesMode } from "../types";
 
@@ -109,9 +110,9 @@ export function PrintOptionsPage() {
 
       <h1 className="font-display text-2xl font-extrabold text-ink">Print Options</h1>
       <p className="mt-1 text-muted truncate">{file.originalName}</p>
-      <p className="text-sm text-muted">
-        {file.pageCount} page{file.pageCount !== 1 ? "s" : ""} · {file.orientation.toLowerCase()}
-      </p>
+
+      {/* Live Mobile Document Preview */}
+      <DocumentPreview sessionId={sessionId!} file={file} />
 
       <OptionSection icon={<FileStack size={18} />} title="Paper Size">
         <div className="grid grid-cols-4 gap-2">

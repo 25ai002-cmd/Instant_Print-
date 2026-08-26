@@ -35,6 +35,10 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await client.delete(`/session/${sessionId}`);
 }
 
+export function getFilePreviewUrl(sessionId: string): string {
+  return `${API_BASE_URL}/file/${sessionId}/preview`;
+}
+
 export async function uploadFile(
   sessionId: string,
   file: File,
