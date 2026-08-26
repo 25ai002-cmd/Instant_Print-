@@ -239,24 +239,77 @@ export function PrintOptionsPage() {
         </div>
       </OptionSection>
 
-      {/* Copies Counter */}
-      <OptionSection icon={<Copy size={18} />} title="Number of Copies">
-        <div className="flex items-center gap-4 bg-white p-2.5 rounded-control border border-slate-200 shadow-sm w-fit">
-          <button
-            onClick={() => setCopies((c) => Math.max(1, c - 1))}
-            className="w-10 h-10 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-xl font-bold text-ink transition-transform flex items-center justify-center"
-          >
-            −
-          </button>
-          <span className="font-display text-xl font-extrabold w-10 text-center text-ink">{copies}</span>
-          <button
-            onClick={() => setCopies((c) => Math.min(99, c + 1))}
-            className="w-10 h-10 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-xl font-bold text-ink transition-transform flex items-center justify-center"
-          >
-            +
-          </button>
-        </div>
-      </OptionSection>
+      {/* Row: Copies Counter on Left, Page Sides Selection on Right */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+        {/* Number of Copies */}
+        <OptionSection icon={<Copy size={18} />} title="Number of Copies">
+          <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-200 shadow-sm w-full">
+            <span className="text-xs font-bold text-slate-600">Copies:</span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setCopies((c) => Math.max(1, c - 1))}
+                className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-xl font-bold text-ink transition-transform flex items-center justify-center border border-slate-200"
+              >
+                −
+              </button>
+              <span className="font-display text-xl font-extrabold w-8 text-center text-ink">{copies}</span>
+              <button
+                type="button"
+                onClick={() => setCopies((c) => Math.min(99, c + 1))}
+                className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-xl font-bold text-ink transition-transform flex items-center justify-center border border-slate-200"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </OptionSection>
+
+        {/* Page Sides Selection directly on Right */}
+        <OptionSection icon={<Layers size={18} />} title="Page Sides &amp; Layout">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSides("SINGLE");
+                setPagesPerSheet(1);
+              }}
+              className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center ${
+                sides === "SINGLE" && pagesPerSheet === 1
+                  ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-sm"
+                  : "bg-white border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <span className="font-display text-sm font-bold text-ink block">
+                Single Sided
+              </span>
+              <span className="text-[10px] text-muted block mt-0.5">
+                1 Page / Sheet
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSides("DOUBLE");
+                setPagesPerSheet(1);
+              }}
+              className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center relative ${
+                sides === "DOUBLE" && pagesPerSheet === 1
+                  ? "bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm"
+                  : "bg-white border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <span className="font-display text-sm font-bold text-ink block">
+                Double Sided
+              </span>
+              <span className="text-[10px] font-extrabold text-emerald-600 block mt-0.5">
+                Save 10% (Duplex)
+              </span>
+            </button>
+          </div>
+        </OptionSection>
+      </div>
 
       {/* Color vs B&W */}
       <OptionSection icon={<Palette size={18} />} title="Color Mode">
@@ -267,91 +320,6 @@ export function PrintOptionsPage() {
           <ChipButton active={colorMode === "COLOR"} onClick={() => setColorMode("COLOR")}>
             Full Color (₹10/pg)
           </ChipButton>
-        </div>
-      </OptionSection>
-
-      {/* Single Sided vs Double Sided vs 2-in-1 Side-by-Side */}
-      <OptionSection icon={<Layers size={18} />} title="Page Sides &amp; Layout">
-        <div className="flex flex-col gap-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              setSides("SINGLE");
-              setPagesPerSheet(1);
-            }}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
-              sides === "SINGLE" && pagesPerSheet === 1
-                ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-sm"
-                : "bg-white border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-primary/20">
-              1S
-            </div>
-            <div>
-              <span className="font-display text-sm font-bold text-ink block">
-                Single Sided (1 Page per Sheet)
-              </span>
-              <span className="text-xs text-muted block mt-0.5 leading-normal">
-                Each document page is printed on a separate sheet of paper (front side only).
-              </span>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setSides("DOUBLE");
-              setPagesPerSheet(1);
-            }}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
-              sides === "DOUBLE" && pagesPerSheet === 1
-                ? "bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm"
-                : "bg-white border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-emerald-200">
-              2S
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-display text-sm font-bold text-ink">
-                  Double Sided (Front &amp; Back Duplex)
-                </span>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  SAVE 10%
-                </span>
-              </div>
-              <span className="text-xs text-muted block mt-0.5 leading-normal">
-                Prints on both sides of each paper sheet (front and back duplex).
-              </span>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setSides("SINGLE");
-              setPagesPerSheet(2);
-            }}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
-              pagesPerSheet === 2
-                ? "bg-blue-50/80 border-blue-500 ring-2 ring-blue-500/20 shadow-sm"
-                : "bg-white border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-blue-200">
-              2-in-1
-            </div>
-            <div>
-              <span className="font-display text-sm font-bold text-ink block">
-                2 Pages on 1 Sheet (Side-by-Side)
-              </span>
-              <span className="text-xs text-muted block mt-0.5 leading-normal">
-                Shrinks 2 document pages side-by-side onto a single sheet of paper.
-              </span>
-            </div>
-          </button>
         </div>
       </OptionSection>
 
