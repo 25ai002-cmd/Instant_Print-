@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Smartphone, QrCode, AlertTriangle, Printer } from "lucide-react";
@@ -12,12 +13,22 @@ const PRINT_POLL_MS = 1000;
 const COLLECT_COUNTDOWN_SECONDS = 10;
 
 export function KioskDisplay() {
+  const navigate = useNavigate();
   const [session, setSession] = useState<KioskSession | null>(null);
   const [mobileUrl, setMobileUrl] = useState("");
   const [qrImageDataUrl, setQrImageDataUrl] = useState("");
   const [countdown, setCountdown] = useState(COLLECT_COUNTDOWN_SECONDS);
   const sessionIdRef = useRef<string | null>(null);
   const resettingRef = useRef(false);
+
+  // Guard: Never show Kiosk QR Display screen on mobile handheld devices
+  useEffect(() => {
+    const isMobileDevice =
+      window.innerWidth < 768 || /android|iphone|ipad|ipod|blackberry|windows phone/i.test(navigator.userAgent);
+    if (isMobileDevice) {
+      navigate("/expired", { replace: true });
+    }
+  }, [navigate]);
 
   const startNewSession = useCallback(async () => {
     resettingRef.current = false;

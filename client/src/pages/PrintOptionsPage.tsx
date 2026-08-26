@@ -9,6 +9,23 @@ import { ColorMode, FileMeta, PageRangeMode, PaperSize, PriceBreakdown, SidesMod
 
 const PAPER_SIZES: PaperSize[] = ["A4", "A3", "Legal", "Letter"];
 
+function parsePageRangeString(rangeStr: string, totalPages: number): number[] {
+  const pages = new Set<number>();
+  const parts = rangeStr.split(",").map((p) => p.trim()).filter(Boolean);
+  for (const part of parts) {
+    const rangeMatch = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (rangeMatch) {
+      const start = Math.max(1, parseInt(rangeMatch[1], 10));
+      const end = Math.min(totalPages, parseInt(rangeMatch[2], 10));
+      for (let p = start; p <= end; p++) pages.add(p);
+    } else if (/^\d+$/.test(part)) {
+      const p = parseInt(part, 10);
+      if (p >= 1 && p <= totalPages) pages.add(p);
+    }
+  }
+  return Array.from(pages).sort((a, b) => a - b);
+}
+
 export function PrintOptionsPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
@@ -220,7 +237,12 @@ export function PrintOptionsPage() {
             value={customPageRange}
             onChange={(e) => {
               setPageRangeMode("CUSTOM");
-              setCustomPageRange(e.target.value);
+              const val = e.target.value;
+              setCustomPageRange(val);
+              if (file?.pageCount) {
+                const parsed = parsePageRangeString(val, file.pageCount);
+                setSelectedPages(parsed);
+              }
             }}
             placeholder={`e.g. 1-3, 5, 8-10 (max ${file.pageCount})`}
             className="w-full rounded-control border border-slate-200 px-4 py-3 text-ink text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary shadow-sm bg-white"
