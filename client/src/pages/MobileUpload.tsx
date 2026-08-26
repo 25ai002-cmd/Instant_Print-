@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { UploadCloud, FileText, Camera, AlertCircle, Loader2, Smartphone } from "lucide-react";
+import { UploadCloud, FileText, Camera, AlertCircle, Loader2, Smartphone, QrCode } from "lucide-react";
 import { Logo } from "../components/Logo";
 import { BigButton } from "../components/BigButton";
 import { attachSession, apiErrorMessage, uploadFile } from "../services/api";
@@ -19,6 +19,7 @@ export function MobileUpload() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [isBusy, setIsBusy] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -29,8 +30,11 @@ export function MobileUpload() {
     }
 
     attachSession(sessionId, clientToken).catch((err: any) => {
-      if (err?.response?.status === 409 || err?.status === 409) {
+      const status = err?.response?.status || err?.status;
+      if (status === 409) {
         setIsBusy(true);
+      } else if (status === 404) {
+        setIsExpired(true);
       }
     });
   }, [sessionId]);
@@ -45,8 +49,13 @@ export function MobileUpload() {
         await uploadFile(sessionId, file, setProgress);
         // Seamless transition to options page — backend handles DB persistence
         navigate(`/options/${sessionId}`);
-      } catch (err) {
-        setError(apiErrorMessage(err, "We couldn't read that file. Please try another."));
+      } catch (err: any) {
+        const status = err?.response?.status || err?.status;
+        if (status === 404) {
+          setIsExpired(true);
+        } else {
+          setError(apiErrorMessage(err, "We couldn't read that file. Please try another."));
+        }
         setUploading(false);
       }
     },
@@ -60,6 +69,46 @@ export function MobileUpload() {
     if (file) doUpload(file);
   };
 
+  if (isExpired) {
+    return (
+      <div className="mobile-shell text-center py-10 px-4">
+        <div className="pt-2 pb-6 flex justify-center">
+          <Logo />
+        </div>
+
+        <div className="w-20 h-20 mx-auto rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
+          <QrCode size={40} />
+        </div>
+
+        <h1 className="font-display text-2xl font-extrabold text-ink tracking-tight">
+          Session Expired or Kiosk Reset
+        </h1>
+
+        <p className="mt-2 text-sm text-muted max-w-xs mx-auto leading-relaxed">
+          This upload QR code is from a previous session that has ended or was reset by the kiosk screen.
+        </p>
+
+        <div className="mt-6 p-4 rounded-control bg-primary/5 border border-primary/20 text-xs font-semibold text-slate-700 leading-normal">
+          📲 Please scan the new QR code displayed live on the PrintATM kiosk monitor screen to start a fresh upload.
+        </div>
+
+        <button
+          onClick={() => {
+            const isAndroid = /android/i.test(navigator.userAgent);
+            if (isAndroid) {
+              window.location.href = "intent://com.google.ar.lens/v1#Intent;scheme=googlelens;package=com.google.ar.lens;end";
+            } else {
+              window.location.href = "/";
+            }
+          }}
+          className="mt-6 w-full py-3.5 px-6 rounded-control bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+        >
+          <Camera size={18} /> Open Camera / Scan Kiosk QR Code
+        </button>
+      </div>
+    );
+  }
+
   if (isBusy) {
     return (
       <div className="mobile-shell text-center py-10 px-4">
@@ -67,7 +116,7 @@ export function MobileUpload() {
           <Logo />
         </div>
 
-        <div className="w-20 h-20 mx-auto rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-4">
+        <div className="w-20 h-20 mx-auto rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-4 shadow-sm">
           <Smartphone size={40} />
         </div>
 
@@ -116,57 +165,58 @@ export function MobileUpload() {
           {uploading ? (
             <>
               <Loader2 className="text-primary animate-spin" size={48} />
-              <p className="font-display font-bold text-lg text-ink">Analyzing & storing document…</p>
+              <p className="font-display font-bold text-lg text-ink">Analyzing &amp; storing document…</p>
               <div className="w-full max-w-xs h-2 rounded-full bg-surface-alt overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-200" style={{ width: `${progress}%` }} />
+                <div
+                  className="h-full bg-primary transition-all duration-300 rounded-full"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
+              <p className="text-xs text-muted font-semibold">{progress}% uploaded</p>
             </>
           ) : (
             <>
-              <div className="w-16 h-16 rounded-full bg-primary-light flex items-center justify-center">
-                <UploadCloud className="text-primary" size={30} />
+              <div className="w-16 h-16 rounded-full bg-primary-light text-primary flex items-center justify-center shadow-soft">
+                <UploadCloud size={32} />
               </div>
               <div>
-                <p className="font-display font-bold text-ink">Drag & drop your file here</p>
-                <p className="text-sm text-muted mt-1">or use a button below</p>
+                <p className="font-display font-bold text-ink">Choose a file to print</p>
+                <p className="text-xs text-muted mt-1">Tap a button below or drag file here</p>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) doUpload(f);
+                }}
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) doUpload(f);
+                }}
+              />
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs mt-2">
+                <BigButton onClick={() => fileInputRef.current?.click()} icon={<FileText size={20} />} variant="primary">
+                  Browse Files
+                </BigButton>
+                <BigButton onClick={() => cameraInputRef.current?.click()} icon={<Camera size={20} />} variant="secondary">
+                  Take Photo
+                </BigButton>
               </div>
             </>
           )}
         </motion.div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPTED}
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && doUpload(e.target.files[0])}
-        />
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && doUpload(e.target.files[0])}
-        />
-
-        <div className="mt-6 flex flex-col gap-3">
-          <BigButton icon={<FileText size={20} />} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-            Browse Files
-          </BigButton>
-          <BigButton
-            variant="secondary"
-            icon={<Camera size={20} />}
-            onClick={() => cameraInputRef.current?.click()}
-            disabled={uploading}
-          >
-            Take a Photo
-          </BigButton>
-        </div>
-
-        <p className="mt-6 text-xs text-center text-muted">
-          Max file size 50MB. Password-protected files can't be printed here.
-        </p>
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ import {
   updateDocumentStatus,
 } from "./database";
 
-const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes TTL for active sessions
+const SESSION_TTL_MS = 60 * 60 * 1000; // 60 minutes TTL for active sessions
 const CLEANUP_INTERVAL_MS = 30 * 1000;
 
 class SessionManager {
