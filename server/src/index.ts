@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
 import sessionRoutes from "./routes/session";
 import uploadRoutes from "./routes/upload";
 import priceRoutes from "./routes/price";
@@ -23,6 +24,19 @@ app.use("/api", priceRoutes);
 app.use("/api", paymentRoutes);
 app.use("/api", printRoutes);
 app.use("/api", dbRoutes);
+
+// Serve client static files in production
+const clientDistPath = path.resolve(__dirname, "../../client/dist");
+app.use(express.static(clientDistPath));
+
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    return next();
+  }
+  res.sendFile(path.join(clientDistPath, "index.html"), (err) => {
+    if (err) next();
+  });
+});
 
 app.use(notFoundHandler);
 app.use(errorHandler);
