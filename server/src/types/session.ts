@@ -33,6 +33,7 @@ export interface PrintOptions {
   copies: number;
   colorMode: ColorMode;
   sides: SidesMode;
+  pagesPerSheet?: number; // 1 or 2 pages per paper sheet
   pageRangeMode: PageRangeMode;
   customPageRange?: string; // e.g. "1-3,5"
   pagesToPrint: number; // resolved count after applying range x copies is computed separately

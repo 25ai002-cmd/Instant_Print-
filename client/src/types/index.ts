@@ -33,6 +33,7 @@ export interface PrintOptions {
   copies: number;
   colorMode: ColorMode;
   sides: SidesMode;
+  pagesPerSheet?: number;
   pageRangeMode: PageRangeMode;
   customPageRange?: string;
   pagesToPrint: number;

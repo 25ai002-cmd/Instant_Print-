@@ -21,6 +21,7 @@ export function PrintOptionsPage() {
   const [copies, setCopies] = useState(1);
   const [colorMode, setColorMode] = useState<ColorMode>("BW");
   const [sides, setSides] = useState<SidesMode>("SINGLE");
+  const [pagesPerSheet, setPagesPerSheet] = useState<number>(1);
   const [pageRangeMode, setPageRangeMode] = useState<PageRangeMode>("ALL");
   const [customPageRange, setCustomPageRange] = useState("");
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
@@ -92,11 +93,12 @@ export function PrintOptionsPage() {
       copies,
       colorMode,
       sides,
+      pagesPerSheet,
       pageRangeMode,
       customPageRange: pageRangeMode === "CUSTOM" ? customPageRange : undefined,
       pagesToPrint: pageRangeMode === "ALL" ? file?.pageCount ?? 0 : selectedPages.length,
     }),
-    [paperSize, copies, colorMode, sides, pageRangeMode, customPageRange, selectedPages.length, file]
+    [paperSize, copies, colorMode, sides, pagesPerSheet, pageRangeMode, customPageRange, selectedPages.length, file]
   );
 
   // Live price recalculation whenever any option changes.
@@ -268,15 +270,88 @@ export function PrintOptionsPage() {
         </div>
       </OptionSection>
 
-      {/* Single vs Double Sided */}
-      <OptionSection icon={<Layers size={18} />} title="Sides Printing">
-        <div className="grid grid-cols-2 gap-2">
-          <ChipButton active={sides === "SINGLE"} onClick={() => setSides("SINGLE")}>
-            Single Sided
-          </ChipButton>
-          <ChipButton active={sides === "DOUBLE"} onClick={() => setSides("DOUBLE")}>
-            Double Sided (Save 10%)
-          </ChipButton>
+      {/* Single Sided vs Double Sided vs 2-in-1 Side-by-Side */}
+      <OptionSection icon={<Layers size={18} />} title="Page Sides &amp; Layout">
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              setSides("SINGLE");
+              setPagesPerSheet(1);
+            }}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+              sides === "SINGLE" && pagesPerSheet === 1
+                ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-sm"
+                : "bg-white border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-primary/20">
+              1S
+            </div>
+            <div>
+              <span className="font-display text-sm font-bold text-ink block">
+                Single Sided (1 Page per Sheet)
+              </span>
+              <span className="text-xs text-muted block mt-0.5 leading-normal">
+                Each document page is printed on a separate sheet of paper (front side only).
+              </span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSides("DOUBLE");
+              setPagesPerSheet(1);
+            }}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+              sides === "DOUBLE" && pagesPerSheet === 1
+                ? "bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm"
+                : "bg-white border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-emerald-200">
+              2S
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-display text-sm font-bold text-ink">
+                  Double Sided (Front &amp; Back Duplex)
+                </span>
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  SAVE 10%
+                </span>
+              </div>
+              <span className="text-xs text-muted block mt-0.5 leading-normal">
+                Prints on both sides of each paper sheet (front and back duplex).
+              </span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSides("SINGLE");
+              setPagesPerSheet(2);
+            }}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+              pagesPerSheet === 2
+                ? "bg-blue-50/80 border-blue-500 ring-2 ring-blue-500/20 shadow-sm"
+                : "bg-white border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-blue-200">
+              2-in-1
+            </div>
+            <div>
+              <span className="font-display text-sm font-bold text-ink block">
+                2 Pages on 1 Sheet (Side-by-Side)
+              </span>
+              <span className="text-xs text-muted block mt-0.5 leading-normal">
+                Shrinks 2 document pages side-by-side onto a single sheet of paper.
+              </span>
+            </div>
+          </button>
         </div>
       </OptionSection>
 
