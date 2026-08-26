@@ -5,6 +5,7 @@ import { PrintOptionsPage } from "./pages/PrintOptionsPage";
 import { PaymentScreen } from "./pages/PaymentScreen";
 import { PrintingScreen } from "./pages/PrintingScreen";
 import { PrintComplete } from "./pages/PrintComplete";
+import { SessionExpired } from "./pages/SessionExpired";
 import { NotFound } from "./pages/NotFound";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
       <Route path="/payment/:sessionId" element={<PaymentScreen />} />
       <Route path="/printing/:sessionId" element={<PrintingScreen />} />
       <Route path="/complete/:sessionId" element={<PrintComplete />} />
+      <Route path="/expired" element={<SessionExpired />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

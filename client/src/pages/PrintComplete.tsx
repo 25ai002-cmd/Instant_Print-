@@ -52,13 +52,13 @@ export function PrintComplete() {
 
       {/* Itemized Invoice & Tax Receipt */}
       {session && session.file ? (
-        <InvoiceReceipt session={session} onDone={() => navigate("/")} />
+        <InvoiceReceipt session={session} onDone={() => navigate("/expired")} />
       ) : (
         <div className="mt-8 p-6 rounded-card bg-white border border-slate-200 shadow-sm text-center">
           <p className="text-sm font-bold text-ink">Invoice generated &amp; saved.</p>
           <p className="text-xs text-muted mt-1">Your print job was completed successfully.</p>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/expired")}
             className="mt-4 px-6 py-2.5 rounded-control bg-primary text-white font-bold text-sm"
           >
             Done
