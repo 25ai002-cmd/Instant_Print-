@@ -16,6 +16,10 @@ export interface PendingPrintJob {
   totalPages: number;
   colorMode: string;
   copies: number;
+  sides?: string;
+  pageRangeMode?: string;
+  customPageRange?: string;
+  pagesPerSheet?: number;
 }
 
 /**
@@ -74,8 +78,15 @@ function pollAndPrintRemoteJobs(remoteCloudUrl: string) {
             
             await downloadFile(job.fileUrl, tempFilePath);
 
-            console.log(`[CloudPrinterBridge] File downloaded to "${tempFilePath}". Spooling to physical printer "${realBrotherPrinterDriver.detectedPrinterName}"...`);
-            await realBrotherPrinterDriver.startJob(job.sessionId, job.totalPages, tempFilePath);
+            console.log(`[CloudPrinterBridge] File downloaded to "${tempFilePath}". Spooling to physical printer "${realBrotherPrinterDriver.detectedPrinterName}" (Range: ${job.customPageRange || "ALL"}, Sides: ${job.sides || "SINGLE"})...`);
+            await realBrotherPrinterDriver.startJob(job.sessionId, job.totalPages, tempFilePath, {
+              copies: job.copies,
+              colorMode: job.colorMode as any,
+              sides: job.sides as any,
+              pageRangeMode: job.pageRangeMode as any,
+              customPageRange: job.customPageRange,
+              pagesPerSheet: job.pagesPerSheet,
+            });
             markSpooledRemote(remoteCloudUrl, job.sessionId);
           }
         } catch (err: any) {

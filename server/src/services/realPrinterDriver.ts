@@ -69,7 +69,7 @@ export class UniversalPrinterDriver implements PrinterDriver {
     return true;
   }
 
-  async startJob(sessionId: string, totalPages: number, filePath?: string): Promise<void> {
+  async startJob(sessionId: string, totalPages: number, filePath?: string, options?: any): Promise<void> {
     this.cancelJob(sessionId);
 
     // Refresh OS printer list before spooling to ensure USB printer is active
@@ -105,14 +105,28 @@ export class UniversalPrinterDriver implements PrinterDriver {
     // Execute physical spooler command to send file directly to local USB / Wi-Fi printer
     if (filePath && fs.existsSync(filePath)) {
       try {
-        const fileToSpool = await convertToPdfIfNeeded(filePath);
+        const fileToSpool = await convertToPdfIfNeeded(filePath, options);
         console.log(`[UniversalPrinterDriver] Spooling file "${fileToSpool}" to physical printer "${printerName}"...`);
 
         if (process.platform === "win32") {
           let spooled = false;
           if (pdfToPrinter) {
             try {
-              await pdfToPrinter.print(fileToSpool, { printer: printerName });
+              const printConfig: any = { printer: printerName };
+              if (options?.copies && options.copies > 1) {
+                printConfig.copies = options.copies;
+              }
+              if (options?.pageRangeMode === "CUSTOM" && options?.customPageRange) {
+                printConfig.pages = options.customPageRange;
+              }
+              if (options?.sides === "DOUBLE") {
+                printConfig.sides = "duplexlong";
+              } else {
+                printConfig.sides = "simplex";
+              }
+
+              console.log(`[UniversalPrinterDriver] Spooling with options:`, printConfig);
+              await pdfToPrinter.print(fileToSpool, printConfig);
               spooled = true;
               console.log(`[UniversalPrinterDriver] 🖨️ Physical print job spooled via pdf-to-printer to "${printerName}"!`);
             } catch (pErr: any) {
@@ -130,7 +144,9 @@ export class UniversalPrinterDriver implements PrinterDriver {
           }
         } else {
           // Linux / macOS CUPS lp spooling
-          exec(`lp -d "${printerName}" "${fileToSpool}"`);
+          const rangeFlag = options?.pageRangeMode === "CUSTOM" && options?.customPageRange ? `-P ${options.customPageRange}` : "";
+          const sidesFlag = options?.sides === "DOUBLE" ? "-o sides=two-sided-long-edge" : "-o sides=one-sided";
+          exec(`lp -d "${printerName}" ${rangeFlag} ${sidesFlag} "${fileToSpool}"`);
           console.log(`[UniversalPrinterDriver] 🖨️ Physical print job spooled via CUPS lp to "${printerName}"!`);
         }
       } catch (err: any) {

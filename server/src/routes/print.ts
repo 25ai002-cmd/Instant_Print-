@@ -64,6 +64,10 @@ router.get(
         totalPages: (s.price?.bwPages || 0) + (s.price?.colorPages || 0) || s.file!.pageCount,
         colorMode: s.options?.colorMode || "BW",
         copies: s.options?.copies || 1,
+        sides: s.options?.sides || "SINGLE",
+        pageRangeMode: s.options?.pageRangeMode || "ALL",
+        customPageRange: s.options?.pageRangeMode === "CUSTOM" ? s.options?.customPageRange : undefined,
+        pagesPerSheet: s.options?.pagesPerSheet || 1,
       }));
 
     res.json(pendingJobs);
@@ -106,7 +110,7 @@ router.post(
       ? realBrotherPrinterDriver
       : printerDriver;
 
-    activeDriver.startJob(session.id, totalPhysicalPages, filePath);
+    activeDriver.startJob(session.id, totalPhysicalPages, filePath, session.options);
 
     const updated = sessionManager.update(session.id, {
       stage: "PRINTING",

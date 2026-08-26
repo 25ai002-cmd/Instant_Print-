@@ -7,7 +7,7 @@ import fs from "fs";
  * so they can be spooled directly to physical printers via pdf-to-printer
  * without ever opening Microsoft Office dialog popups!
  */
-export function convertToPdfIfNeeded(filePath: string): Promise<string> {
+export function convertToPdfIfNeeded(filePath: string, _options?: any): Promise<string> {
   return new Promise((resolve) => {
     if (!filePath || !fs.existsSync(filePath)) {
       resolve(filePath);
