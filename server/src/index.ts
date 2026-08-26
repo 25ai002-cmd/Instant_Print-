@@ -9,6 +9,8 @@ import printRoutes from "./routes/print";
 import dbRoutes from "./routes/dbRoutes";
 import { initDatabase } from "./services/database";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { getLocalWifiIp } from "./utils/network";
+import { startCloudPrinterBridge } from "./services/cloudPrinterBridge";
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -45,8 +47,17 @@ app.use(errorHandler);
 initDatabase()
   .then(() => {
     app.listen(PORT, () => {
-      // eslint-disable-next-line no-console
-      console.log(`PrintATM server listening on http://localhost:${PORT}`);
+      const wifiIp = getLocalWifiIp();
+      console.log(`==================================================`);
+      console.log(`  PrintATM Server active on port ${PORT}`);
+      console.log(`  Local Access: http://localhost:${PORT}`);
+      if (wifiIp) {
+        console.log(`  Local Wi-Fi Access: http://${wifiIp}:${PORT}`);
+      }
+      console.log(`==================================================`);
+
+      // Start Cloud-to-Local Printer Bridge worker
+      startCloudPrinterBridge();
     });
   })
   .catch((err) => {

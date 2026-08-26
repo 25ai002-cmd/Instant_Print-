@@ -3,10 +3,9 @@ import QRCode from "qrcode";
 import { sessionManager } from "../services/sessionManager";
 import { printerDriver } from "../services/printerSimulator";
 import { asyncHandler } from "../middleware/errorHandler";
+import { getLocalWifiIp } from "../utils/network";
 
 const router = Router();
-
-const MOBILE_BASE_URL = process.env.MOBILE_BASE_URL ?? "http://localhost:5173";
 
 /**
  * Kiosk calls this on load (and again after every reset) to mint a fresh
@@ -21,7 +20,13 @@ router.post(
     if (!baseUrl) {
       const host = (req.headers["x-forwarded-host"] as string) || req.headers.host;
       const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      baseUrl = host ? `${proto}://${host}` : "http://localhost:5173";
+      
+      if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
+        baseUrl = `${proto}://${host}`;
+      } else {
+        const wifiIp = getLocalWifiIp();
+        baseUrl = wifiIp ? `http://${wifiIp}:4000` : host ? `${proto}://${host}` : "http://localhost:5173";
+      }
     }
 
     const mobileUrl = `${baseUrl}/upload/${session.id}`;

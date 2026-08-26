@@ -46,6 +46,30 @@ router.post(
   })
 );
 
+// Endpoint for Local Printer Bridge to query active print jobs waiting to be spooled
+router.get(
+  "/pending-print-jobs",
+  asyncHandler(async (req, res) => {
+    const host = (req.headers["x-forwarded-host"] as string) || req.headers.host;
+    const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+    const baseUrl = `${proto}://${host}`;
+
+    const activeSessions = sessionManager.getAllSessions();
+    const pendingJobs = activeSessions
+      .filter((s) => s.stage === "PRINTING" && s.file)
+      .map((s) => ({
+        sessionId: s.id,
+        originalName: s.file!.originalName,
+        fileUrl: `${baseUrl}/api/file/${s.id}/preview`,
+        totalPages: (s.price?.bwPages || 0) + (s.price?.colorPages || 0) || s.file!.pageCount,
+        colorMode: s.options?.colorMode || "BW",
+        copies: s.options?.copies || 1,
+      }));
+
+    res.json(pendingJobs);
+  })
+);
+
 router.post(
   "/start-print",
   asyncHandler(async (req, res) => {

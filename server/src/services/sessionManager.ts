@@ -35,6 +35,10 @@ class SessionManager {
     return this.sessions.get(id);
   }
 
+  getAllSessions(): KioskSession[] {
+    return Array.from(this.sessions.values());
+  }
+
   requireSession(id: string): KioskSession {
     const session = this.sessions.get(id);
     if (!session) {
