@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Smartphone, QrCode, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Smartphone, QrCode, AlertTriangle, Printer } from "lucide-react";
 import { Logo } from "../components/Logo";
 import { KioskCard } from "../components/KioskCard";
 import { StatusRing } from "../components/StatusRing";
-import { createSession, deleteSession, getPrintStatus, getSession } from "../services/api";
+import { createSession, deleteSession, getFilePreviewUrl, getPrintStatus, getSession } from "../services/api";
 import { KioskSession } from "../types";
 
 const POLL_MS = 2000;
@@ -103,7 +103,7 @@ export function KioskDisplay() {
         )}
 
         {stage === "PRINTING" && (
-          <PrintingView key="printing" progress={session?.printJob?.progressPercent ?? 0} />
+          <PrintingView key="printing" progress={session?.printJob?.progressPercent ?? 0} session={session} />
         )}
 
         {stage === "COMPLETED" && <CompleteView key="complete" countdown={countdown} session={session} />}
@@ -164,16 +164,63 @@ function ContinueOnPhoneView({ stage, session }: { stage: string; session: Kiosk
   );
 }
 
-function PrintingView({ progress }: { progress: number }) {
+function PrintingView({ progress, session }: { progress: number; session: KioskSession | null }) {
+  const printedRef = useRef(false);
+
+  useEffect(() => {
+    if (session?.id && !printedRef.current) {
+      printedRef.current = true;
+      triggerBrowserPrint(session.id);
+    }
+  }, [session?.id]);
+
   return (
     <KioskCard className="text-center">
       <StatusRing percent={progress} size={280}>
         <span className="font-display text-5xl font-extrabold text-primary">{progress}%</span>
       </StatusRing>
-      <h2 className="mt-8 font-display text-3xl font-bold text-ink">Printing…</h2>
-      <p className="mt-3 text-muted text-lg">Please wait. Do not walk away from the machine.</p>
+      <h2 className="mt-8 font-display text-3xl font-extrabold text-ink">Printing Document…</h2>
+      <p className="mt-2 text-muted text-base">Spooling document to your physical printer.</p>
+      
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <button
+          type="button"
+          onClick={() => session?.id && triggerBrowserPrint(session.id)}
+          className="px-6 py-3 rounded-control bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-md transition-all flex items-center gap-2"
+        >
+          <Printer size={18} /> Send to Physical Printer Now
+        </button>
+      </div>
     </KioskCard>
   );
+}
+
+function triggerBrowserPrint(sessionId: string) {
+  try {
+    const previewUrl = getFilePreviewUrl(sessionId);
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.src = previewUrl;
+    document.body.appendChild(iframe);
+    
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch {
+          window.open(previewUrl, "_blank");
+        }
+      }, 400);
+    };
+  } catch (err) {
+    console.error("Print trigger error:", err);
+  }
 }
 
 function CompleteView({ countdown, session }: { countdown: number; session: KioskSession | null }) {
