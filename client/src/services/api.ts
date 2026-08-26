@@ -1,7 +1,11 @@
 import axios from "axios";
 import { DbDocumentRecord, KioskSession, PriceBreakdown, PrintOptions } from "../types";
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? `${window.location.origin}/api`
+    : "http://localhost:4000/api");
 
 const client = axios.create({ baseURL: API_BASE_URL, timeout: 15000 });
 

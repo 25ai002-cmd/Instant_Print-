@@ -14,9 +14,17 @@ const MOBILE_BASE_URL = process.env.MOBILE_BASE_URL ?? "http://localhost:5173";
  */
 router.post(
   "/session",
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     const session = sessionManager.create();
-    const mobileUrl = `${MOBILE_BASE_URL}/upload/${session.id}`;
+    
+    let baseUrl = process.env.MOBILE_BASE_URL;
+    if (!baseUrl) {
+      const host = (req.headers["x-forwarded-host"] as string) || req.headers.host;
+      const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      baseUrl = host ? `${proto}://${host}` : "http://localhost:5173";
+    }
+
+    const mobileUrl = `${baseUrl}/upload/${session.id}`;
     const qrImageDataUrl = await QRCode.toDataURL(mobileUrl, { margin: 1, width: 480 });
 
     res.json({
