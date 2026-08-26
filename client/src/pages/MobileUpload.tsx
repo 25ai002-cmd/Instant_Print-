@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { UploadCloud, FileText, Camera, AlertCircle, Loader2 } from "lucide-react";
+import { UploadCloud, FileText, Camera, AlertCircle, Loader2, Smartphone } from "lucide-react";
 import { Logo } from "../components/Logo";
 import { BigButton } from "../components/BigButton";
 import { attachSession, apiErrorMessage, uploadFile } from "../services/api";
@@ -18,8 +18,21 @@ export function MobileUpload() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const [isBusy, setIsBusy] = useState(false);
+
   useEffect(() => {
-    if (sessionId) attachSession(sessionId).catch(() => undefined);
+    if (!sessionId) return;
+    let clientToken = sessionStorage.getItem("printatm_client_token");
+    if (!clientToken) {
+      clientToken = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      sessionStorage.setItem("printatm_client_token", clientToken);
+    }
+
+    attachSession(sessionId, clientToken).catch((err: any) => {
+      if (err?.response?.status === 409 || err?.status === 409) {
+        setIsBusy(true);
+      }
+    });
   }, [sessionId]);
 
   const doUpload = useCallback(
@@ -46,6 +59,32 @@ export function MobileUpload() {
     const file = e.dataTransfer.files?.[0];
     if (file) doUpload(file);
   };
+
+  if (isBusy) {
+    return (
+      <div className="mobile-shell text-center py-10 px-4">
+        <div className="pt-2 pb-6 flex justify-center">
+          <Logo />
+        </div>
+
+        <div className="w-20 h-20 mx-auto rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-4">
+          <Smartphone size={40} />
+        </div>
+
+        <h1 className="font-display text-2xl font-extrabold text-ink tracking-tight">
+          Kiosk Currently Busy
+        </h1>
+
+        <p className="mt-2 text-sm text-muted max-w-xs mx-auto leading-relaxed">
+          Another customer is currently using this PrintATM kiosk. For security, only one phone can connect at a time.
+        </p>
+
+        <div className="mt-8 p-4 rounded-control bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+          ⏳ Please wait for the current customer to finish, or scan the new QR code when available.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mobile-shell">

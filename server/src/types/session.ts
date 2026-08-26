@@ -92,6 +92,7 @@ export interface KioskSession {
   createdAt: number;
   updatedAt: number;
   expiresAt: number;
+  attachedClientToken?: string;
   accessCode?: string;
   file?: FileMeta;
   options?: PrintOptions;

@@ -26,8 +26,8 @@ export async function getSession(sessionId: string): Promise<KioskSession> {
   return data;
 }
 
-export async function attachSession(sessionId: string): Promise<KioskSession> {
-  const { data } = await client.post<KioskSession>(`/session/${sessionId}/attach`);
+export async function attachSession(sessionId: string, clientToken?: string): Promise<KioskSession> {
+  const { data } = await client.post<KioskSession>(`/session/${sessionId}/attach`, { clientToken });
   return data;
 }
 

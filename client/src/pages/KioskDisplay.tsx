@@ -94,8 +94,12 @@ export function KioskDisplay() {
       </div>
 
       <AnimatePresence mode="wait">
-        {(stage === "CREATED" || stage === "AWAITING_UPLOAD") && (
+        {stage === "CREATED" && (
           <HomeView key="home" qrImageDataUrl={qrImageDataUrl} mobileUrl={mobileUrl} />
+        )}
+
+        {stage === "AWAITING_UPLOAD" && (
+          <PhoneConnectedView key="phone_connected" />
         )}
 
         {(stage === "FILE_UPLOADED" || stage === "AWAITING_PAYMENT" || stage === "PAYMENT_FAILED") && (
@@ -138,6 +142,35 @@ function HomeView({ qrImageDataUrl, mobileUrl }: { qrImageDataUrl: string; mobil
       </div>
 
       <p className="mt-8 text-sm text-muted break-all">{mobileUrl}</p>
+    </KioskCard>
+  );
+}
+
+function PhoneConnectedView() {
+  return (
+    <KioskCard className="text-center">
+      <div className="flex justify-center my-6">
+        <StatusRing size={240} color="#10B981" trackColor="#D1FAE5">
+          <div className="flex flex-col items-center gap-2 text-emerald-600">
+            <Smartphone size={56} className="animate-bounce" />
+            <span className="font-display font-extrabold text-xs tracking-wider uppercase bg-emerald-100 text-emerald-800 py-1 px-3 rounded-full">
+              Connected
+            </span>
+          </div>
+        </StatusRing>
+      </div>
+
+      <h2 className="mt-8 font-display text-3xl font-extrabold text-ink tracking-tight">
+        📱 Phone Connected!
+      </h2>
+      <p className="mt-3 text-muted text-lg max-w-md mx-auto">
+        A customer has scanned the QR code and is selecting a document to print.
+      </p>
+
+      <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+        Single-User Session Active · Scanner Locked
+      </div>
     </KioskCard>
   );
 }

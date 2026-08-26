@@ -50,12 +50,29 @@ router.get(
   })
 );
 
-/** Phone calls this when it first opens the upload link, to move past CREATED. */
+/** Phone calls this when it first opens the upload link, locking the kiosk to 1 connected phone. */
 router.post(
   "/session/:id/attach",
   asyncHandler(async (req, res) => {
-    const session = sessionManager.setStage(req.params.id, "AWAITING_UPLOAD");
-    res.json(session);
+    const { clientToken } = req.body as { clientToken?: string };
+    const session = sessionManager.requireSession(req.params.id);
+
+    // Single-user lock check: if another device is already attached, reject extra connections
+    if (session.attachedClientToken && clientToken && session.attachedClientToken !== clientToken) {
+      res.status(409).json({
+        error: "Kiosk Busy: Another phone is currently connected to this PrintATM machine.",
+        stage: "BUSY",
+      });
+      return;
+    }
+
+    const token = clientToken || session.attachedClientToken || req.ip || "phone_client";
+    const updated = sessionManager.update(session.id, {
+      stage: "AWAITING_UPLOAD",
+      attachedClientToken: token,
+    });
+
+    res.json(updated);
   })
 );
 
