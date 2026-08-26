@@ -121,10 +121,7 @@ export function KioskDisplay() {
 function HomeView({ qrImageDataUrl, mobileUrl }: { qrImageDataUrl: string; mobileUrl: string }) {
   return (
     <KioskCard className="text-center">
-      <div className="flex justify-center">
-        <Logo size="lg" />
-      </div>
-      <h1 className="mt-10 font-display text-4xl md:text-5xl font-extrabold text-ink leading-tight">
+      <h1 className="mt-4 font-display text-4xl md:text-5xl font-extrabold text-ink leading-tight">
         Welcome to PrintATM
       </h1>
       <p className="mt-3 text-lg text-muted">Scan the QR code on your phone to upload your document.</p>

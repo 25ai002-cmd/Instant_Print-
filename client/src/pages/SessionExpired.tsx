@@ -1,8 +1,26 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, ShieldCheck, RefreshCw } from "lucide-react";
+import { CheckCircle2, ShieldCheck, FilePlus, Loader2 } from "lucide-react";
 import { Logo } from "../components/Logo";
+import { createSession } from "../services/api";
 
 export function SessionExpired() {
+  const navigate = useNavigate();
+  const [loadingNew, setLoadingNew] = useState(false);
+
+  const handlePrintAnother = async () => {
+    setLoadingNew(true);
+    try {
+      const created = await createSession();
+      navigate(`/upload/${created.sessionId}`);
+    } catch {
+      window.location.href = "/";
+    } finally {
+      setLoadingNew(false);
+    }
+  };
+
   return (
     <div className="mobile-shell text-center py-10 px-4">
       <div className="pt-2 pb-6 flex justify-center">
@@ -39,12 +57,19 @@ export function SessionExpired() {
       </div>
 
       <div className="mt-8">
-        <p className="text-xs text-muted font-medium mb-3">Want to print another file?</p>
+        <p className="text-xs text-muted font-medium mb-3">Want to print another file right now?</p>
         <button
-          onClick={() => (window.location.href = "/")}
-          className="w-full py-3 px-6 rounded-control bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+          onClick={handlePrintAnother}
+          disabled={loadingNew}
+          className="w-full py-3.5 px-6 rounded-control bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
         >
-          <RefreshCw size={16} /> Scan Kiosk QR Code Again
+          {loadingNew ? (
+            <Loader2 className="animate-spin" size={18} />
+          ) : (
+            <>
+              <FilePlus size={18} /> Print Another Document
+            </>
+          )}
         </button>
       </div>
     </div>
