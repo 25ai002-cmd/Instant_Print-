@@ -155,8 +155,6 @@ function HomeView({ qrImageDataUrl, mobileUrl }: { qrImageDataUrl: string; mobil
           </div>
         </div>
       </div>
-
-      <p className="mt-8 text-sm text-muted break-all">{mobileUrl}</p>
     </KioskCard>
   );
 }
