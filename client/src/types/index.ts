@@ -94,6 +94,7 @@ export interface KioskSession {
   price?: PriceBreakdown;
   payment?: PaymentInfo;
   printJob?: PrintJobInfo;
+  spooledToPhysical?: boolean;
   errorMessage?: string;
 }
 

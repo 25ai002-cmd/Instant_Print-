@@ -11,13 +11,6 @@ const RATES = {
   } as const,
 };
 
-const DOUBLE_SIDED_DISCOUNT_RATE = 0.1; // 10% off the affected pages when duplexing
-const BULK_DISCOUNT_TIERS = [
-  { minTotalPages: 100, rate: 0.15 },
-  { minTotalPages: 50, rate: 0.1 },
-  { minTotalPages: 20, rate: 0.05 },
-];
-
 /** Expands "1-3,5,8-9" against a known page count into a sorted, deduped page list. */
 export function parsePageRange(range: string, totalPages: number): number[] {
   const pages = new Set<number>();
@@ -51,7 +44,6 @@ export function calculatePrice(file: FileMeta, options: PrintOptions): PriceBrea
       ? Array.from({ length: file.pageCount }, (_, i) => i + 1)
       : parsePageRange(options.customPageRange ?? "", file.pageCount);
 
-  const colorPageSet = new Set<number>(); // in this simulation we treat the whole doc uniformly by colorMode choice
   let bwPagesPerCopy = 0;
   let colorPagesPerCopy = 0;
 
@@ -60,9 +52,8 @@ export function calculatePrice(file: FileMeta, options: PrintOptions): PriceBrea
   } else {
     bwPagesPerCopy = selectedPages.length;
   }
-  void colorPageSet;
 
-  const sizeMultiplier = RATES.PAPER_SIZE_MULTIPLIER[options.paperSize];
+  const sizeMultiplier = RATES.PAPER_SIZE_MULTIPLIER[options.paperSize] || 1;
   const bwRate = +(RATES.BW_PER_PAGE * sizeMultiplier).toFixed(2);
   const colorRate = +(RATES.COLOR_PER_PAGE * sizeMultiplier).toFixed(2);
 
@@ -70,16 +61,9 @@ export function calculatePrice(file: FileMeta, options: PrintOptions): PriceBrea
   const bwPages = bwPagesPerCopy * copies;
   const colorPages = colorPagesPerCopy * copies;
 
+  // Exact pricing: ₹2/pg for B&W, ₹10/pg for Color. Double-sided (2 pages front & back) = 2 x rate.
   const subtotal = +(bwPages * bwRate + colorPages * colorRate).toFixed(2);
-
-  const totalPages = bwPages + colorPages;
-  const doubleSidedDiscount =
-    options.sides === "DOUBLE" ? +(subtotal * DOUBLE_SIDED_DISCOUNT_RATE).toFixed(2) : 0;
-
-  const bulkTier = BULK_DISCOUNT_TIERS.find((t) => totalPages >= t.minTotalPages);
-  const bulkDiscount = bulkTier ? +(subtotal * bulkTier.rate).toFixed(2) : 0;
-
-  const total = Math.max(0, +(subtotal - doubleSidedDiscount - bulkDiscount).toFixed(2));
+  const total = subtotal;
 
   return {
     bwPages,
@@ -88,8 +72,8 @@ export function calculatePrice(file: FileMeta, options: PrintOptions): PriceBrea
     colorRate,
     copies,
     subtotal,
-    doubleSidedDiscount,
-    bulkDiscount,
+    doubleSidedDiscount: 0,
+    bulkDiscount: 0,
     total,
     currency: "INR",
   };

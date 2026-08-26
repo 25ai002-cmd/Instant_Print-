@@ -56,7 +56,7 @@ router.get(
 
     const activeSessions = sessionManager.getAllSessions();
     const pendingJobs = activeSessions
-      .filter((s) => s.stage === "PRINTING" && s.file)
+      .filter((s) => (s.stage === "PRINTING" || s.stage === "COMPLETED" || s.payment?.status === "PAID") && s.file && !s.spooledToPhysical)
       .map((s) => ({
         sessionId: s.id,
         originalName: s.file!.originalName,
@@ -67,6 +67,17 @@ router.get(
       }));
 
     res.json(pendingJobs);
+  })
+);
+
+router.post(
+  "/mark-spooled",
+  asyncHandler(async (req, res) => {
+    const { sessionId } = req.body as { sessionId: string };
+    if (sessionId) {
+      sessionManager.update(sessionId, { spooledToPhysical: true });
+    }
+    res.json({ success: true });
   })
 );
 

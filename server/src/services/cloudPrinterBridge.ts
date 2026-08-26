@@ -76,6 +76,7 @@ function pollAndPrintRemoteJobs(remoteCloudUrl: string) {
 
             console.log(`[CloudPrinterBridge] File downloaded to "${tempFilePath}". Spooling to physical printer "${realBrotherPrinterDriver.detectedPrinterName}"...`);
             await realBrotherPrinterDriver.startJob(job.sessionId, job.totalPages, tempFilePath);
+            markSpooledRemote(remoteCloudUrl, job.sessionId);
           }
         } catch (err: any) {
           console.error(`[CloudPrinterBridge] Processing error:`, err?.message || err);
@@ -108,4 +109,23 @@ function downloadFile(fileUrl: string, destPath: string): Promise<void> {
         reject(err);
       });
   });
+}
+
+function markSpooledRemote(remoteCloudUrl: string, sessionId: string) {
+  try {
+    const u = new URL(`${remoteCloudUrl}/api/mark-spooled`);
+    const client = u.protocol === "https:" ? https : http;
+    const data = JSON.stringify({ sessionId });
+    const req = client.request(u, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(data),
+      },
+    });
+    req.write(data);
+    req.end();
+  } catch {
+    // transient
+  }
 }

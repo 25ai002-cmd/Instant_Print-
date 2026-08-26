@@ -304,7 +304,7 @@ export function PrintOptionsPage() {
                 Double Sided
               </span>
               <span className="text-[10px] font-extrabold text-emerald-600 block mt-0.5">
-                Save 10% (Duplex)
+                Front &amp; Back (2 Pgs/Sheet)
               </span>
             </button>
           </div>
