@@ -6,9 +6,9 @@ echo               Starting PrintATM Kiosk
 echo ==================================================
 echo.
 
-:: Kill any stale process on port 3002 before starting
-echo Checking for stale processes on port 3002...
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3002"') do (
+:: Kill any stale process on port 4000 before starting
+echo Checking for stale processes on port 4000...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":4000"') do (
     taskkill /F /PID %%a >nul 2>&1
 )
 
@@ -36,7 +36,7 @@ if not exist "client\node_modules\" (
 )
 
 echo.
-echo Launching backend API (port 3002) and frontend (port 5173)...
+echo Launching backend API (port 4000) and frontend (port 5173)...
 echo Open browser at: http://localhost:5173
 echo Close this window to stop the application.
 echo.
