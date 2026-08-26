@@ -107,22 +107,30 @@ export class UniversalPrinterDriver implements PrinterDriver {
         console.log(`[UniversalPrinterDriver] Spooling file "${filePath}" to physical printer "${printerName}"...`);
 
         if (process.platform === "win32") {
-          if (pdfToPrinter && filePath.toLowerCase().endsWith(".pdf")) {
-            await pdfToPrinter.print(filePath, { printer: printerName });
-          } else {
-            // PowerShell physical print spooling
+          let spooled = false;
+          if (pdfToPrinter) {
+            try {
+              await pdfToPrinter.print(filePath, { printer: printerName });
+              spooled = true;
+              console.log(`[UniversalPrinterDriver] 🖨️ Physical print job spooled via pdf-to-printer to "${printerName}"!`);
+            } catch (pErr: any) {
+              console.warn(`[UniversalPrinterDriver] pdf-to-printer notice: ${pErr?.message}`);
+            }
+          }
+          if (!spooled) {
+            // PowerShell physical print spooling fallback
             const escapedPath = filePath.replace(/'/g, "''");
             const escapedPrinter = printerName.replace(/'/g, "''");
             exec(
               `powershell -Command "Start-Process -FilePath '${escapedPath}' -Verb PrintTo -ArgumentList '${escapedPrinter}'"`
             );
+            console.log(`[UniversalPrinterDriver] 🖨️ Physical print job spooled via PowerShell PrintTo to "${printerName}"!`);
           }
         } else {
           // Linux / macOS CUPS lp spooling
           exec(`lp -d "${printerName}" "${filePath}"`);
+          console.log(`[UniversalPrinterDriver] 🖨️ Physical print job spooled via CUPS lp to "${printerName}"!`);
         }
-
-        console.log(`[UniversalPrinterDriver] Physical print job spooled successfully to "${printerName}"!`);
       } catch (err: any) {
         console.error(`[UniversalPrinterDriver] Physical print spooling warning:`, err?.message || err);
       }
