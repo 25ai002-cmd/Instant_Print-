@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { PrintJobInfo, PrinterState } from "../types/session";
 import { PrinterDriver } from "./printerSimulator";
+import { convertToPdfIfNeeded } from "./officeConverter";
 
 let pdfToPrinter: any = null;
 try {
@@ -104,13 +105,14 @@ export class UniversalPrinterDriver implements PrinterDriver {
     // Execute physical spooler command to send file directly to local USB / Wi-Fi printer
     if (filePath && fs.existsSync(filePath)) {
       try {
-        console.log(`[UniversalPrinterDriver] Spooling file "${filePath}" to physical printer "${printerName}"...`);
+        const fileToSpool = await convertToPdfIfNeeded(filePath);
+        console.log(`[UniversalPrinterDriver] Spooling file "${fileToSpool}" to physical printer "${printerName}"...`);
 
         if (process.platform === "win32") {
           let spooled = false;
           if (pdfToPrinter) {
             try {
-              await pdfToPrinter.print(filePath, { printer: printerName });
+              await pdfToPrinter.print(fileToSpool, { printer: printerName });
               spooled = true;
               console.log(`[UniversalPrinterDriver] 🖨️ Physical print job spooled via pdf-to-printer to "${printerName}"!`);
             } catch (pErr: any) {
@@ -119,16 +121,16 @@ export class UniversalPrinterDriver implements PrinterDriver {
           }
           if (!spooled) {
             // PowerShell physical print spooling fallback
-            const escapedPath = filePath.replace(/'/g, "''");
+            const escapedPath = fileToSpool.replace(/'/g, "''");
             const escapedPrinter = printerName.replace(/'/g, "''");
             exec(
-              `powershell -Command "Start-Process -FilePath '${escapedPath}' -Verb PrintTo -ArgumentList '${escapedPrinter}'"`
+              `powershell -Command "Start-Process -FilePath '${escapedPath}' -Verb PrintTo -ArgumentList '${escapedPrinter}' -WindowStyle Hidden"`
             );
             console.log(`[UniversalPrinterDriver] 🖨️ Physical print job spooled via PowerShell PrintTo to "${printerName}"!`);
           }
         } else {
           // Linux / macOS CUPS lp spooling
-          exec(`lp -d "${printerName}" "${filePath}"`);
+          exec(`lp -d "${printerName}" "${fileToSpool}"`);
           console.log(`[UniversalPrinterDriver] 🖨️ Physical print job spooled via CUPS lp to "${printerName}"!`);
         }
       } catch (err: any) {
