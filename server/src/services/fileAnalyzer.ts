@@ -112,26 +112,13 @@ async function analyzePdf(
     throw new FileValidationError("This PDF has no readable pages.");
   }
 
-  // Sample the first page's geometry for orientation; a full per-page pass isn't
-  // needed for a kiosk-side estimate, and mixed orientation is rare in practice.
   let orientation: FileMeta["orientation"] = "PORTRAIT";
-  let blankPageCount = 0;
   try {
     const firstPage = await doc.getPage(1);
     const viewport = firstPage.getViewport({ scale: 1 });
     orientation = viewport.width > viewport.height ? "LANDSCAPE" : "PORTRAIT";
-
-    // Cheap blank-page heuristic: pages with (almost) no extractable text and no
-    // operator list entries are very likely blank. This is a simulation-friendly
-    // approximation — real hardware would rasterize and check pixel coverage.
-    for (let i = 1; i <= pageCount; i++) {
-      const page = i === 1 ? firstPage : await doc.getPage(i);
-      const textContent = await page.getTextContent();
-      const hasText = textContent.items.some((item: any) => (item.str ?? "").trim().length > 0);
-      if (!hasText) blankPageCount++;
-    }
   } catch {
-    // Geometry/text sampling is best-effort; fall back to safe defaults.
+    // Geometry sampling is best-effort; fall back to PORTRAIT
   }
 
   return {
@@ -142,7 +129,7 @@ async function analyzePdf(
     pageCount,
     colorPageCount: pageCount,
     bwPageCount: 0,
-    blankPageCount,
+    blankPageCount: 0,
     orientation,
     detectedPaperSize: "A4",
   };

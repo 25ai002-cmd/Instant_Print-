@@ -18,6 +18,8 @@ export class UniversalPrinterDriver implements PrinterDriver {
 
   constructor() {
     this.refreshPrinters();
+    // Continuous USB & Wi-Fi printer auto-plug-and-play scanner (polls every 3s)
+    setInterval(() => this.refreshPrinters(), 3000).unref();
   }
 
   /** Scans local system OS for all installed physical printers (Windows PowerShell / Linux lpstat). */
@@ -41,13 +43,18 @@ export class UniversalPrinterDriver implements PrinterDriver {
 
         this.availablePrinters = list.length > 0 ? list : stdout.split(/\r?\n/).map((p) => p.trim()).filter(Boolean);
 
-        if (!this.detectedPrinterName && this.availablePrinters.length > 0) {
-          // Auto-select first physical printer (or Brother/HP/Canon if present)
-          const preferred =
-            this.availablePrinters.find((p) => /brother|hp|canon|epson|xerox|samsung/i.test(p)) ||
-            this.availablePrinters[0];
-          this.detectedPrinterName = preferred;
-          console.log(`[UniversalPrinterDriver] Selected physical printer: "${preferred}"`);
+        // Instant USB Auto-Plug-and-Play binding:
+        if (!this.detectedPrinterName || !this.availablePrinters.includes(this.detectedPrinterName)) {
+          if (this.availablePrinters.length > 0) {
+            const preferred =
+              this.availablePrinters.find((p) => /brother|hp|canon|epson|xerox|samsung|ricoh|kyocera/i.test(p)) ||
+              this.availablePrinters[0];
+            
+            if (this.detectedPrinterName !== preferred) {
+              this.detectedPrinterName = preferred;
+              console.log(`[UniversalPrinterDriver] 🖨️ USB/Wi-Fi Physical Printer Connected: "${preferred}"`);
+            }
+          }
         }
 
         resolve(this.availablePrinters);
@@ -64,9 +71,12 @@ export class UniversalPrinterDriver implements PrinterDriver {
   async startJob(sessionId: string, totalPages: number, filePath?: string): Promise<void> {
     this.cancelJob(sessionId);
 
+    // Refresh OS printer list before spooling to ensure USB printer is active
+    await this.refreshPrinters();
+
     const printerName = this.detectedPrinterName || "System Default Printer";
     const startedAt = Date.now();
-    const estSeconds = Math.max(3, totalPages * 2.5);
+    const estSeconds = Math.max(3, totalPages * 2);
 
     const info: PrintJobInfo = {
       state: "RECEIVING",
@@ -81,9 +91,9 @@ export class UniversalPrinterDriver implements PrinterDriver {
       const elapsed = (Date.now() - startedAt) / 1000;
       if (job.info.state === "RECEIVING") {
         job.info.state = "PRINTING";
-        job.info.progressPercent = 25;
+        job.info.progressPercent = 30;
       } else if (job.info.state === "PRINTING") {
-        const progress = Math.min(95, Math.round(25 + (elapsed / estSeconds) * 70));
+        const progress = Math.min(95, Math.round(30 + (elapsed / estSeconds) * 65));
         job.info.progressPercent = progress;
         job.info.estimatedSecondsRemaining = Math.max(0, Math.ceil(estSeconds - elapsed));
       }
@@ -112,7 +122,7 @@ export class UniversalPrinterDriver implements PrinterDriver {
           exec(`lp -d "${printerName}" "${filePath}"`);
         }
 
-        console.log(`[UniversalPrinterDriver] Physical print job submitted successfully!`);
+        console.log(`[UniversalPrinterDriver] Physical print job spooled successfully to "${printerName}"!`);
       } catch (err: any) {
         console.error(`[UniversalPrinterDriver] Physical print spooling warning:`, err?.message || err);
       }
