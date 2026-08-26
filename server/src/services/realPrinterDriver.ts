@@ -109,6 +109,18 @@ export class UniversalPrinterDriver implements PrinterDriver {
         console.log(`[UniversalPrinterDriver] Spooling file "${fileToSpool}" to physical printer "${printerName}"...`);
 
         if (process.platform === "win32") {
+          const escapedPrinter = printerName.replace(/'/g, "''");
+          const duplexMode = options?.sides === "DOUBLE" ? "TwoSidedLongEdge" : "OneSided";
+          
+          // Dynamically configure Windows OS Print Ticket DuplexingMode for Brother/HP physical printer
+          exec(`powershell -Command "Set-PrintConfiguration -PrinterName '${escapedPrinter}' -DuplexingMode ${duplexMode}"`, (setErr) => {
+            if (setErr) {
+              console.warn(`[UniversalPrinterDriver] Set-PrintConfiguration notice: ${setErr.message}`);
+            } else {
+              console.log(`[UniversalPrinterDriver] ⚙️ Windows Printer DuplexingMode updated to: ${duplexMode}`);
+            }
+          });
+
           let spooled = false;
           if (pdfToPrinter) {
             try {
@@ -121,8 +133,12 @@ export class UniversalPrinterDriver implements PrinterDriver {
               }
               if (options?.sides === "DOUBLE") {
                 printConfig.sides = "duplexlong";
+                printConfig.side = "duplex";
+                printConfig.duplex = "duplexlong";
               } else {
                 printConfig.sides = "simplex";
+                printConfig.side = "simplex";
+                printConfig.duplex = "simplex";
               }
 
               console.log(`[UniversalPrinterDriver] Spooling with options:`, printConfig);
@@ -136,7 +152,6 @@ export class UniversalPrinterDriver implements PrinterDriver {
           if (!spooled) {
             // PowerShell physical print spooling fallback
             const escapedPath = fileToSpool.replace(/'/g, "''");
-            const escapedPrinter = printerName.replace(/'/g, "''");
             exec(
               `powershell -Command "Start-Process -FilePath '${escapedPath}' -Verb PrintTo -ArgumentList '${escapedPrinter}' -WindowStyle Hidden"`
             );
