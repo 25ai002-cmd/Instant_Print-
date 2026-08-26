@@ -1,24 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, ShieldCheck, FilePlus, Loader2 } from "lucide-react";
+import { CheckCircle2, ShieldCheck, QrCode, Lock } from "lucide-react";
 import { Logo } from "../components/Logo";
-import { createSession } from "../services/api";
 
 export function SessionExpired() {
-  const navigate = useNavigate();
-  const [loadingNew, setLoadingNew] = useState(false);
-
-  const handlePrintAnother = async () => {
-    setLoadingNew(true);
-    try {
-      const created = await createSession();
-      navigate(`/upload/${created.sessionId}`);
-    } catch {
-      window.location.href = "/";
-    } finally {
-      setLoadingNew(false);
-    }
+  const handleScanAgain = () => {
+    sessionStorage.clear();
+    localStorage.removeItem("printatm_client_token");
+    window.location.href = "/";
   };
 
   return (
@@ -31,7 +19,7 @@ export function SessionExpired() {
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 15 }}
-        className="w-20 h-20 mx-auto rounded-full bg-slate-100 text-primary border border-slate-200 flex items-center justify-center mb-4"
+        className="w-20 h-20 mx-auto rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mb-4 shadow-sm"
       >
         <ShieldCheck size={44} />
       </motion.div>
@@ -41,35 +29,33 @@ export function SessionExpired() {
       </h1>
 
       <p className="mt-2 text-sm text-muted max-w-xs mx-auto leading-relaxed">
-        Your document print job is complete. For your privacy, your session and uploaded files have been securely erased.
+        Your document print job is complete. For your security and privacy, this mobile session has been closed and all temporary upload files have been wiped.
       </p>
 
-      <div className="mt-8 p-4 rounded-control bg-slate-50 border border-slate-200 text-left space-y-2">
+      <div className="mt-6 p-4 rounded-control bg-slate-50 border border-slate-200 text-left space-y-2.5">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-          <CheckCircle2 size={16} className="text-emerald-500" /> Document Printed &amp; Collected
+          <CheckCircle2 size={16} className="text-emerald-500" /> Document Printed &amp; Spooled
         </div>
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-          <CheckCircle2 size={16} className="text-emerald-500" /> Temporary Upload Wiped
+          <CheckCircle2 size={16} className="text-emerald-500" /> Uploaded File Securely Erased
         </div>
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-          <CheckCircle2 size={16} className="text-emerald-500" /> Payment Receipt Generated
+          <Lock size={16} className="text-slate-400" /> Single-User Session Expired
         </div>
       </div>
 
-      <div className="mt-8">
-        <p className="text-xs text-muted font-medium mb-3">Want to print another file right now?</p>
+      <div className="mt-8 p-5 rounded-2xl bg-primary/5 border border-primary/20 text-center">
+        <QrCode className="mx-auto text-primary mb-2" size={32} />
+        <h3 className="font-display text-sm font-bold text-slate-800">Want to Print Another File?</h3>
+        <p className="text-xs text-slate-600 mt-1 leading-normal">
+          Please scan the new QR code displayed on the PrintATM kiosk screen to start a fresh session.
+        </p>
+
         <button
-          onClick={handlePrintAnother}
-          disabled={loadingNew}
-          className="w-full py-3.5 px-6 rounded-control bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+          onClick={handleScanAgain}
+          className="mt-4 w-full py-3.5 px-6 rounded-control bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
         >
-          {loadingNew ? (
-            <Loader2 className="animate-spin" size={18} />
-          ) : (
-            <>
-              <FilePlus size={18} /> Print Another Document
-            </>
-          )}
+          <QrCode size={18} /> Scan Kiosk QR Code Again
         </button>
       </div>
     </div>

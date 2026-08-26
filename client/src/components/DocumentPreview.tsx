@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FileText, Maximize2, X, FileImage, Loader2, RefreshCw } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
-import { ColorMode, FileMeta } from "../types";
+import { ColorMode, FileMeta, SidesMode } from "../types";
 import { getFilePreviewUrl } from "../services/api";
 
 // Configure PDF.js worker
@@ -11,10 +11,11 @@ interface DocumentPreviewProps {
   sessionId: string;
   file: FileMeta;
   colorMode?: ColorMode;
+  sides?: SidesMode;
   selectedPagesCount?: number;
 }
 
-export function DocumentPreview({ sessionId, file, colorMode = "BW", selectedPagesCount }: DocumentPreviewProps) {
+export function DocumentPreview({ sessionId, file, colorMode = "BW", sides = "SINGLE", selectedPagesCount }: DocumentPreviewProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [pdfRenderError, setPdfRenderError] = useState(false);
@@ -176,22 +177,28 @@ export function DocumentPreview({ sessionId, file, colorMode = "BW", selectedPag
         </div>
 
         {/* Metadata Badges */}
-        <div className="mt-3 grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
-          <div className="bg-slate-50 rounded-lg py-1.5 px-2 border border-slate-100">
-            <span className="block text-[10px] text-muted uppercase font-bold">Selected Pages</span>
-            <span className="font-display text-xs font-extrabold text-ink">
-              {selectedPagesCount !== undefined ? `${selectedPagesCount} of ${file.pageCount}` : `${file.pageCount} pgs`}
+        <div className="mt-3 grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100 text-center">
+          <div className="bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100">
+            <span className="block text-[9px] text-muted uppercase font-bold">Pages</span>
+            <span className="font-display text-[11px] font-extrabold text-ink">
+              {selectedPagesCount !== undefined ? `${selectedPagesCount}/${file.pageCount}` : `${file.pageCount}`}
             </span>
           </div>
-          <div className="bg-slate-50 rounded-lg py-1.5 px-2 border border-slate-100">
-            <span className="block text-[10px] text-muted uppercase font-bold">Color Mode</span>
-            <span className="font-display text-xs font-extrabold text-primary">
-              {colorMode === "COLOR" ? "Full Color" : "Black & White"}
+          <div className="bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100">
+            <span className="block text-[9px] text-muted uppercase font-bold">Color</span>
+            <span className="font-display text-[11px] font-extrabold text-primary">
+              {colorMode === "COLOR" ? "Color" : "B & W"}
             </span>
           </div>
-          <div className="bg-slate-50 rounded-lg py-1.5 px-2 border border-slate-100">
-            <span className="block text-[10px] text-muted uppercase font-bold">File Size</span>
-            <span className="font-display text-xs font-extrabold text-ink">{sizeFormatted}</span>
+          <div className="bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100">
+            <span className="block text-[9px] text-muted uppercase font-bold">Sides</span>
+            <span className="font-display text-[11px] font-extrabold text-emerald-600">
+              {sides === "DOUBLE" ? "Double" : "Single"}
+            </span>
+          </div>
+          <div className="bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100">
+            <span className="block text-[9px] text-muted uppercase font-bold">Size</span>
+            <span className="font-display text-[11px] font-extrabold text-ink">{sizeFormatted}</span>
           </div>
         </div>
       </div>

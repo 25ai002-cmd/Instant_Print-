@@ -9,7 +9,7 @@ import { KioskSession } from "../types";
 
 const POLL_MS = 2000;
 const PRINT_POLL_MS = 1000;
-const COLLECT_COUNTDOWN_SECONDS = 2;
+const COLLECT_COUNTDOWN_SECONDS = 10;
 
 export function KioskDisplay() {
   const [session, setSession] = useState<KioskSession | null>(null);
@@ -110,7 +110,9 @@ export function KioskDisplay() {
           <PrintingView key="printing" progress={session?.printJob?.progressPercent ?? 0} session={session} />
         )}
 
-        {stage === "COMPLETED" && <CompleteView key="complete" countdown={countdown} session={session} />}
+        {stage === "COMPLETED" && (
+          <CompleteView key="complete" countdown={countdown} session={session} onContinue={startNewSession} />
+        )}
 
         {stage === "ERROR" && <ErrorView key="error" />}
       </AnimatePresence>
@@ -264,11 +266,19 @@ function triggerBrowserPrint(sessionId: string) {
   }
 }
 
-function CompleteView({ countdown, session }: { countdown: number; session: KioskSession | null }) {
+function CompleteView({
+  countdown,
+  session,
+  onContinue,
+}: {
+  countdown: number;
+  session: KioskSession | null;
+  onContinue: () => void;
+}) {
   const singleRate = session?.options?.colorMode === "COLOR" ? 10.0 : 2.0;
   const pgs = session?.options?.pagesToPrint || session?.file?.pageCount || 1;
   const cps = session?.options?.copies || 1;
-  const total = session?.price?.total ?? (singleRate * pgs * cps);
+  const total = session?.price?.total ?? singleRate * pgs * cps;
 
   return (
     <KioskCard className="text-center">
@@ -278,31 +288,43 @@ function CompleteView({ countdown, session }: { countdown: number; session: Kios
         </div>
       </motion.div>
       <h2 className="mt-6 font-display text-3xl font-extrabold text-ink">Printing Complete!</h2>
-      <p className="mt-2 text-muted text-base">Please collect your documents from the tray.</p>
+      <p className="mt-2 text-muted text-base">Please collect your printed documents from the tray.</p>
 
-      {/* Itemized Calculation Summary Box */}
-      <div className="mt-6 p-4 rounded-control bg-slate-50 border border-slate-200 text-left text-xs">
+      {/* Itemized Invoice Receipt Box */}
+      <div className="mt-6 p-4 rounded-control bg-slate-50 border border-slate-200 text-left text-xs shadow-sm">
         <div className="flex justify-between items-center pb-2 border-b border-slate-200 font-bold text-ink">
-          <span>TAX RECEIPT</span>
-          <span className="text-emerald-600">PAID ✅</span>
+          <span>TAX INVOICE RECEIPT</span>
+          <span className="text-emerald-600 font-extrabold">PAID ✅</span>
         </div>
         <div className="mt-2 flex justify-between text-slate-600 font-semibold">
-          <span>Single Page Rate:</span>
-          <span>₹{singleRate.toFixed(2)} / page</span>
+          <span>Single Page Rate ({session?.options?.colorMode === "COLOR" ? "Color" : "B&W"}):</span>
+          <span>₹{singleRate.toFixed(2)} / pg</span>
         </div>
         <div className="mt-1 flex justify-between text-ink font-bold text-sm bg-white p-2 rounded border border-slate-200">
-          <span>Formula:</span>
-          <span className="text-primary">₹{singleRate.toFixed(2)} × {pgs} pgs × {cps} {cps === 1 ? "copy" : "copies"}</span>
+          <span>Total Pages &amp; Copies:</span>
+          <span className="text-primary">
+            ₹{singleRate.toFixed(2)} × {pgs} pgs × {cps} {cps === 1 ? "copy" : "copies"}
+          </span>
         </div>
         <div className="mt-2 flex justify-between font-extrabold text-ink text-base pt-1">
-          <span>Total Cost:</span>
-          <span>₹{total.toFixed(2)}</span>
+          <span>Total Paid Amount:</span>
+          <span className="text-emerald-700">₹{total.toFixed(2)}</span>
         </div>
       </div>
 
-      <div className="mt-6 flex items-center justify-center gap-2 text-sm font-semibold text-muted">
-        <span>Resetting kiosk in</span>
-        <span className="font-display text-2xl font-extrabold text-primary">{countdown}s</span>
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <button
+          onClick={onContinue}
+          className="w-full py-4 px-6 rounded-2xl bg-primary hover:bg-primary-dark text-white font-extrabold text-base shadow-lg transition-all flex items-center justify-center gap-2 group"
+        >
+          <span>Continue / Scan Next Document</span>
+          <QrCode size={20} className="group-hover:scale-110 transition-transform" />
+        </button>
+
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted">
+          <span>Auto-resetting kiosk QR code in</span>
+          <span className="font-display text-xl font-extrabold text-primary">{countdown}s</span>
+        </div>
       </div>
     </KioskCard>
   );

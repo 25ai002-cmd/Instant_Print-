@@ -163,7 +163,7 @@ export function PrintOptionsPage() {
       </div>
 
       {/* Live Mobile Document Preview Card */}
-      <DocumentPreview sessionId={sessionId!} file={file} colorMode={colorMode} selectedPagesCount={pagesCount} />
+      <DocumentPreview sessionId={sessionId!} file={file} colorMode={colorMode} sides={sides} selectedPagesCount={pagesCount} />
 
       {/* Page Selection & Range Customizer */}
       <OptionSection icon={<FileStack size={18} />} title="Page Selection & Range">
