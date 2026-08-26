@@ -129,16 +129,31 @@ function HomeView({ qrImageDataUrl, mobileUrl }: { qrImageDataUrl: string; mobil
       </h1>
       <p className="mt-3 text-lg text-muted">Scan the QR code on your phone to upload your document.</p>
 
-      <div className="mt-10 flex justify-center">
-        <StatusRing size={300}>
+      <div className="mt-8 flex justify-center">
+        <div className="relative p-5 rounded-3xl bg-white shadow-2xl border-4 border-slate-100 max-w-xs mx-auto group">
+          {/* Subtle Ambient Pulsing Glow */}
+          <div className="absolute inset-0 rounded-3xl bg-primary/10 animate-pulse pointer-events-none" />
+
           {qrImageDataUrl ? (
-            <div className="rounded-3xl bg-white p-4 shadow-soft">
-              <img src={qrImageDataUrl} alt="Scan to start printing" className="w-52 h-52" />
+            <div className="relative rounded-2xl bg-white p-2 border border-slate-100">
+              <img src={qrImageDataUrl} alt="Scan to start printing" className="w-60 h-60 object-contain rounded-lg" />
+              
+              {/* Center Kiosk Icon Badge */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-primary text-white shadow-md border-2 border-white flex items-center justify-center">
+                <QrCode size={20} />
+              </div>
             </div>
           ) : (
-            <QrCode className="text-primary" size={64} />
+            <div className="w-60 h-60 flex items-center justify-center">
+              <QrCode className="text-primary animate-pulse" size={64} />
+            </div>
           )}
-        </StatusRing>
+
+          <div className="mt-3 flex items-center justify-center gap-2 text-xs font-bold text-slate-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            Point phone camera to scan
+          </div>
+        </div>
       </div>
 
       <p className="mt-8 text-sm text-muted break-all">{mobileUrl}</p>

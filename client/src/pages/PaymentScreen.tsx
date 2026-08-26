@@ -4,6 +4,7 @@ import { Loader2, IndianRupee, XCircle, RotateCcw, X, CheckCircle2, ShieldCheck 
 import { Logo } from "../components/Logo";
 import { BigButton } from "../components/BigButton";
 import { StatusRing } from "../components/StatusRing";
+import { UpiQrCard } from "../components/UpiQrCard";
 import {
   apiErrorMessage,
   createPayment,
@@ -153,24 +154,17 @@ export function PaymentScreen() {
       <h1 className="font-display text-2xl font-extrabold text-ink">Scan to Pay</h1>
       <p className="mt-1 text-muted text-sm">Scan with any UPI app OR tap test approval below.</p>
 
-      <div className="mt-6">
-        <StatusRing size={260}>
-          {payment && (
-            <div className="rounded-3xl bg-white p-3 shadow-soft">
-              <img src={payment.qrImageDataUrl} alt="UPI payment QR code" className="w-44 h-44" />
-            </div>
-          )}
-        </StatusRing>
-      </div>
-
-      <div className="mt-4 flex items-center justify-center gap-1 font-display text-3xl font-extrabold text-ink">
-        <IndianRupee size={26} />
-        {payment?.amount.toFixed(2)}
-      </div>
-
-      <p className="mt-1 text-xs text-muted">
-        {secondsLeft > 0 ? `Expires in ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}` : "Expiring…"}
-      </p>
+      {payment && (
+        <div className="mt-4">
+          <UpiQrCard
+            qrImageDataUrl={payment.qrImageDataUrl}
+            amount={payment.amount}
+            secondsLeft={secondsLeft}
+            title="Scan to Pay via UPI"
+            subtitle="Accepts GPay, PhonePe, Paytm, BHIM & all UPI apps"
+          />
+        </div>
+      )}
 
       {/* Prominent Test Mode Payment Approval */}
       <div className="mt-6 w-full max-w-sm rounded-card bg-emerald-50 border border-emerald-200 p-4 shadow-sm">
