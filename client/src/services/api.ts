@@ -100,6 +100,16 @@ export async function getPrintStatus(sessionId: string) {
   return data as { stage: string; printJob: KioskSession["printJob"] };
 }
 
+export async function getPrinterInfo() {
+  const { data } = await client.get("/printer-info");
+  return data as { connected: boolean; printerName: string; availablePrinters: string[] };
+}
+
+export async function selectPrinter(printerName: string) {
+  const { data } = await client.post("/printer/select", { printerName });
+  return data;
+}
+
 export async function listDbDocuments(): Promise<DbDocumentRecord[]> {
   const { data } = await client.get<DbDocumentRecord[]>("/db/documents");
   return data;

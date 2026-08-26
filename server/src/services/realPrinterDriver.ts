@@ -11,48 +11,67 @@ try {
   pdfToPrinter = null;
 }
 
-export class RealBrotherPrinterDriver implements PrinterDriver {
+export class UniversalPrinterDriver implements PrinterDriver {
   private jobs = new Map<string, { info: PrintJobInfo; timer?: NodeJS.Timeout }>();
-  public detectedPrinterName: string | null = "Brother DCP-L2530DW series";
+  public detectedPrinterName: string | null = null;
+  public availablePrinters: string[] = [];
 
   constructor() {
-    this.checkConnectedBrotherPrinter();
+    this.refreshPrinters();
   }
 
-  public checkConnectedBrotherPrinter(): Promise<string | null> {
+  /** Scans local system OS for all installed physical printers (Windows PowerShell / Linux lpstat). */
+  public refreshPrinters(): Promise<string[]> {
     return new Promise((resolve) => {
-      exec('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', (err, stdout) => {
+      const isWin = process.platform === "win32";
+      const cmd = isWin
+        ? 'powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"'
+        : "lpstat -p | awk '{print $2}'";
+
+      exec(cmd, (err, stdout) => {
         if (err || !stdout) {
-          resolve(this.detectedPrinterName);
+          resolve(this.availablePrinters);
           return;
         }
-        const printers = stdout.split(/\r?\n/).map((p) => p.trim()).filter(Boolean);
-        const brother = printers.find((p) => p.toLowerCase().includes("brother"));
-        if (brother) {
-          this.detectedPrinterName = brother;
-          console.log(`[RealPrinterDriver] Detected Brother Physical Printer: "${brother}"`);
-        } else if (printers.length > 0) {
-          // Use default printer if Brother name is slightly different
-          const defaultPrinter = printers.find((p) => !p.includes("PDF") && !p.includes("OneNote")) || printers[0];
-          this.detectedPrinterName = defaultPrinter;
-          console.log(`[RealPrinterDriver] Using physical printer: "${defaultPrinter}"`);
+
+        const list = stdout
+          .split(/\r?\n/)
+          .map((p) => p.trim())
+          .filter((p) => p.length > 0 && !p.includes("PDF") && !p.includes("OneNote") && !p.includes("Fax") && !p.includes("XPS"));
+
+        this.availablePrinters = list.length > 0 ? list : stdout.split(/\r?\n/).map((p) => p.trim()).filter(Boolean);
+
+        if (!this.detectedPrinterName && this.availablePrinters.length > 0) {
+          // Auto-select first physical printer (or Brother/HP/Canon if present)
+          const preferred =
+            this.availablePrinters.find((p) => /brother|hp|canon|epson|xerox|samsung/i.test(p)) ||
+            this.availablePrinters[0];
+          this.detectedPrinterName = preferred;
+          console.log(`[UniversalPrinterDriver] Selected physical printer: "${preferred}"`);
         }
-        resolve(this.detectedPrinterName);
+
+        resolve(this.availablePrinters);
       });
     });
+  }
+
+  public setPrinter(printerName: string): boolean {
+    this.detectedPrinterName = printerName;
+    console.log(`[UniversalPrinterDriver] Active printer updated to: "${printerName}"`);
+    return true;
   }
 
   async startJob(sessionId: string, totalPages: number, filePath?: string): Promise<void> {
     this.cancelJob(sessionId);
 
-    const printerName = this.detectedPrinterName || "Brother DCP-L2530DW series";
+    const printerName = this.detectedPrinterName || "System Default Printer";
     const startedAt = Date.now();
-    const estSeconds = Math.max(3, totalPages * 2);
+    const estSeconds = Math.max(3, totalPages * 2.5);
 
     const info: PrintJobInfo = {
       state: "RECEIVING",
       progressPercent: 10,
-      estimatedSecondsRemaining: estSeconds,
+      estimatedSecondsRemaining: Math.ceil(estSeconds),
     };
 
     const timer = setInterval(() => {
@@ -62,9 +81,9 @@ export class RealBrotherPrinterDriver implements PrinterDriver {
       const elapsed = (Date.now() - startedAt) / 1000;
       if (job.info.state === "RECEIVING") {
         job.info.state = "PRINTING";
-        job.info.progressPercent = 30;
+        job.info.progressPercent = 25;
       } else if (job.info.state === "PRINTING") {
-        const progress = Math.min(95, Math.round(30 + (elapsed / estSeconds) * 65));
+        const progress = Math.min(95, Math.round(25 + (elapsed / estSeconds) * 70));
         job.info.progressPercent = progress;
         job.info.estimatedSecondsRemaining = Math.max(0, Math.ceil(estSeconds - elapsed));
       }
@@ -72,23 +91,34 @@ export class RealBrotherPrinterDriver implements PrinterDriver {
 
     this.jobs.set(sessionId, { info, timer });
 
-    // Execute physical print job to Brother Printer if file exists
+    // Execute physical spooler command to send file directly to local USB / Wi-Fi printer
     if (filePath && fs.existsSync(filePath)) {
       try {
-        console.log(`[RealPrinterDriver] Sending file "${filePath}" to physical printer "${printerName}"...`);
-        if (pdfToPrinter) {
-          await pdfToPrinter.print(filePath, { printer: printerName });
+        console.log(`[UniversalPrinterDriver] Spooling file "${filePath}" to physical printer "${printerName}"...`);
+
+        if (process.platform === "win32") {
+          if (pdfToPrinter && filePath.toLowerCase().endsWith(".pdf")) {
+            await pdfToPrinter.print(filePath, { printer: printerName });
+          } else {
+            // PowerShell physical print spooling
+            const escapedPath = filePath.replace(/'/g, "''");
+            const escapedPrinter = printerName.replace(/'/g, "''");
+            exec(
+              `powershell -Command "Start-Process -FilePath '${escapedPath}' -Verb PrintTo -ArgumentList '${escapedPrinter}'"`
+            );
+          }
         } else {
-          // PowerShell print fallback
-          exec(`powershell -Command "Start-Process -FilePath '${filePath}' -Verb PrintTo -ArgumentList '${printerName}'"`);
+          // Linux / macOS CUPS lp spooling
+          exec(`lp -d "${printerName}" "${filePath}"`);
         }
-        console.log(`[RealPrinterDriver] Physical print job submitted successfully!`);
+
+        console.log(`[UniversalPrinterDriver] Physical print job submitted successfully!`);
       } catch (err: any) {
-        console.error(`[RealPrinterDriver] Print error:`, err?.message || err);
+        console.error(`[UniversalPrinterDriver] Physical print spooling warning:`, err?.message || err);
       }
     }
 
-    // Complete job status after estimation
+    // Complete job status after estimated spool duration
     setTimeout(() => {
       const job = this.jobs.get(sessionId);
       if (job) {
@@ -113,4 +143,4 @@ export class RealBrotherPrinterDriver implements PrinterDriver {
   }
 }
 
-export const realBrotherPrinterDriver = new RealBrotherPrinterDriver();
+export const realBrotherPrinterDriver = new UniversalPrinterDriver();

@@ -6,16 +6,43 @@ import { asyncHandler } from "../middleware/errorHandler";
 
 const router = Router();
 
-// Endpoint to check hardware printer status
+// Endpoint to list all installed hardware physical printers
+router.get(
+  "/printers",
+  asyncHandler(async (_req, res) => {
+    const list = await realBrotherPrinterDriver.refreshPrinters();
+    res.json({
+      availablePrinters: list,
+      activePrinter: realBrotherPrinterDriver.detectedPrinterName,
+    });
+  })
+);
+
+// Endpoint to check active printer status
 router.get(
   "/printer-info",
   asyncHandler(async (_req, res) => {
-    const printerName = await realBrotherPrinterDriver.checkConnectedBrotherPrinter();
+    const list = await realBrotherPrinterDriver.refreshPrinters();
+    const active = realBrotherPrinterDriver.detectedPrinterName;
     res.json({
-      connected: !!printerName,
-      printerName: printerName || "No physical printer detected (simulation active)",
-      port: "USB001",
+      connected: !!active,
+      printerName: active || "No physical printer detected (simulation active)",
+      availablePrinters: list,
     });
+  })
+);
+
+// Endpoint to select specific printer by name
+router.post(
+  "/printer/select",
+  asyncHandler(async (req, res) => {
+    const { printerName } = req.body as { printerName: string };
+    if (!printerName) {
+      res.status(400).json({ error: "printerName is required" });
+      return;
+    }
+    realBrotherPrinterDriver.setPrinter(printerName);
+    res.json({ success: true, activePrinter: printerName });
   })
 );
 
@@ -39,7 +66,7 @@ router.post(
     const totalPhysicalPages = session.price.bwPages + session.price.colorPages;
     const filePath = session.file?.storedPath;
 
-    // Use Real Brother Printer Driver if connected, otherwise fallback to simulator
+    // Use Universal Physical Printer Driver if printer detected, otherwise fallback to simulator
     const activeDriver = realBrotherPrinterDriver.detectedPrinterName
       ? realBrotherPrinterDriver
       : printerDriver;
