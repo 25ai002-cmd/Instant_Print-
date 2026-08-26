@@ -6,7 +6,7 @@ import { Logo } from "../components/Logo";
 import { BigButton } from "../components/BigButton";
 import { attachSession, apiErrorMessage, uploadFile } from "../services/api";
 
-const ACCEPTED = ".pdf,.docx,.pptx,.png,.jpg,.jpeg";
+const ACCEPTED = ".pdf,.docx,.pptx,.doc,.ppt,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,.txt,.rtf,.csv";
 
 export function MobileUpload() {
   const { sessionId } = useParams<{ sessionId: string }>();

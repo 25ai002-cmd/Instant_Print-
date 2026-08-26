@@ -36,23 +36,57 @@ export async function analyzeFile(params: {
     );
   }
 
-  if (!SUPPORTED_MIME_TYPES.has(mimeType)) {
-    throw new FileValidationError(
-      `Unsupported file type "${mimeType}". Please upload a PDF, DOCX, PPTX, PNG, or JPEG.`
-    );
-  }
-
-  if (mimeType === "application/pdf") {
+  if (mimeType === "application/pdf" || originalName.toLowerCase().endsWith(".pdf")) {
     return analyzePdf(path, originalName, mimeType, sizeBytes);
   }
-  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    originalName.toLowerCase().endsWith(".docx")
+  ) {
     return analyzeDocx(path, originalName, mimeType, sizeBytes);
   }
-  if (mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    originalName.toLowerCase().endsWith(".pptx")
+  ) {
     return analyzePptx(path, originalName, mimeType, sizeBytes);
   }
-  // Images
-  return analyzeImage(path, originalName, mimeType, sizeBytes);
+  if (mimeType.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|svg|tiff)$/i.test(originalName)) {
+    return analyzeImage(path, originalName, mimeType, sizeBytes);
+  }
+
+  // Universal handler for all other document, spreadsheet, and text formats
+  return analyzeGenericDocument(path, originalName, mimeType, sizeBytes);
+}
+
+async function analyzeGenericDocument(
+  path: string,
+  originalName: string,
+  mimeType: string,
+  sizeBytes: number
+): Promise<FileMeta> {
+  let pageCount = 1;
+  try {
+    const ext = originalName.toLowerCase().split('.').pop() ?? '';
+    if (['txt', 'csv', 'rtf', 'html', 'doc', 'ppt', 'xls', 'xlsx', 'md', 'json', 'log'].includes(ext)) {
+      pageCount = Math.max(1, Math.ceil(sizeBytes / 2500));
+    }
+  } catch {
+    pageCount = 1;
+  }
+
+  return {
+    originalName,
+    storedPath: path,
+    mimeType: mimeType || "application/octet-stream",
+    sizeBytes,
+    pageCount,
+    colorPageCount: pageCount,
+    bwPageCount: 0,
+    blankPageCount: 0,
+    orientation: "PORTRAIT",
+    detectedPaperSize: "A4",
+  };
 }
 
 async function analyzePdf(

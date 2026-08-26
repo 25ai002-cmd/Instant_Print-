@@ -16,22 +16,11 @@ const storage = multer.diskStorage({
   },
 });
 
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "image/png",
-  "image/jpeg",
-]);
-
 export const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      cb(new Error("UNSUPPORTED_FILE_TYPE"));
-      return;
-    }
+  fileFilter: (_req, _file, cb) => {
+    // Support all documents, photos, text, and spreadsheet files automatically
     cb(null, true);
   },
 });
