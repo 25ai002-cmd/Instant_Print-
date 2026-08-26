@@ -287,8 +287,12 @@ function CompleteView({
           <CheckCircle2 size={48} />
         </div>
       </motion.div>
-      <h2 className="mt-6 font-display text-3xl font-extrabold text-ink">Printing Complete!</h2>
-      <p className="mt-2 text-muted text-base">Please collect your printed documents from the tray.</p>
+      <h2 className="mt-6 font-display text-3xl font-extrabold text-ink">
+        Print Complete! Collect Your Document 🖨️
+      </h2>
+      <p className="mt-2 text-muted text-base">
+        Your physical document has printed out into the paper tray below. Please collect your pages.
+      </p>
 
       {/* Itemized Invoice Receipt Box */}
       <div className="mt-6 p-4 rounded-control bg-slate-50 border border-slate-200 text-left text-xs shadow-sm">

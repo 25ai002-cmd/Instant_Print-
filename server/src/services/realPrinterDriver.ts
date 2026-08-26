@@ -77,7 +77,8 @@ export class UniversalPrinterDriver implements PrinterDriver {
 
     const printerName = this.detectedPrinterName || "System Default Printer";
     const startedAt = Date.now();
-    const estSeconds = Math.max(3, totalPages * 2);
+    const isDoubleSided = options?.sides === "DOUBLE";
+    const estSeconds = Math.max(10, Math.ceil(6 + (totalPages || 1) * (isDoubleSided ? 4.5 : 3)));
 
     const info: PrintJobInfo = {
       state: "RECEIVING",
