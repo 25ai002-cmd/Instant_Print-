@@ -1,7 +1,7 @@
 import type { Config, Context } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
+import { randomUUID } from "crypto";
 import QRCode from "qrcode";
-import { v4 as uuid } from "uuid";
 import AdmZip from "adm-zip";
 import { PDFDocument } from "pdf-lib";
 
@@ -334,7 +334,7 @@ async function fetchRazorpayOrderStatus(orderId: string): Promise<PaymentStatus>
 
 async function buildPaymentInfo(amount: number): Promise<PaymentInfo> {
   const live = isRazorpayLive();
-  const orderId = live ? await createRazorpayOrder(amount) : `sim_order_${uuid()}`;
+  const orderId = live ? await createRazorpayOrder(amount) : `sim_order_${randomUUID()}`;
   const upiVpa = process.env.UPI_PAYEE_VPA ?? "printatm@upi";
   const upiName = process.env.UPI_PAYEE_NAME ?? "PrintATM Kiosk";
   const params = new URLSearchParams({
@@ -388,7 +388,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       const body = await req.json().catch(() => ({})) as { clientOrigin?: string };
       const now = Date.now();
       const session: KioskSession = {
-        id: uuid(),
+        id: randomUUID(),
         stage: "CREATED",
         createdAt: now,
         updatedAt: now,
