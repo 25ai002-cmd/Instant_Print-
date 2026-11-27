@@ -15,12 +15,25 @@ router.post(
   "/session",
   asyncHandler(async (req, res) => {
     const session = sessionManager.create();
-    
+    const { clientOrigin } = (req.body || {}) as { clientOrigin?: string };
+
     let baseUrl = process.env.MOBILE_BASE_URL;
+    if (!baseUrl && clientOrigin && /^https?:\/\/.+/.test(clientOrigin)) {
+      try {
+        const parsed = new URL(clientOrigin);
+        if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+          baseUrl = parsed.origin;
+        }
+      } catch {
+        // ignore invalid clientOrigin
+      }
+    }
+
     if (!baseUrl) {
-      const host = (req.headers["x-forwarded-host"] as string) || req.headers.host;
-      const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      
+      const host = ((req.headers["x-forwarded-host"] as string) || req.headers.host || "").split(",")[0].trim();
+      const rawProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      const proto = rawProto.split(",")[0].trim();
+
       if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
         baseUrl = `${proto}://${host}`;
       } else {

@@ -1,0 +1,13 @@
+[build]
+  command = "npm install && npm --prefix client install && npm --prefix client run build"
+  publish = "client/dist"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# SPA fallback so mobile QR links like /upload/:sessionId load React Router instead of 404
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

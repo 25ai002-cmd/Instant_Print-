@@ -5,9 +5,14 @@ import path from "path";
 import { realBrotherPrinterDriver } from "./realPrinterDriver";
 import { UPLOAD_DIR } from "../middleware/upload";
 
-const RENDER_CLOUD_URL = process.env.RENDER_REMOTE_URL || "https://instant-print-1.onrender.com";
+const RENDER_CLOUD_URL =
+  process.env.CLOUD_URL ||
+  process.env.RENDER_REMOTE_URL ||
+  "https://printatm.netlify.app";
 const POLL_INTERVAL_MS = 1500;
 const processedJobs = new Set<string>();
+const inFlightJobs = new Set<string>();
+let isPolling = false;
 
 export interface PendingPrintJob {
   sessionId: string;
@@ -49,7 +54,10 @@ export function startCloudPrinterBridge(remoteCloudUrl = RENDER_CLOUD_URL) {
 }
 
 function pollAndPrintRemoteJobs(remoteCloudUrl: string) {
-  const endpoint = `${remoteCloudUrl}/api/pending-print-jobs`;
+  if (isPolling) return;
+  isPolling = true;
+
+  const endpoint = `${remoteCloudUrl.replace(/\/+$/, "")}/api/pending-print-jobs`;
   const client = endpoint.startsWith("https") ? https : http;
 
   client
@@ -62,57 +70,82 @@ function pollAndPrintRemoteJobs(remoteCloudUrl: string) {
           const jobs: PendingPrintJob[] = JSON.parse(rawData);
 
           for (const job of jobs) {
-            if (processedJobs.has(job.sessionId)) continue;
-            processedJobs.add(job.sessionId);
+            if (processedJobs.has(job.sessionId) || inFlightJobs.has(job.sessionId)) continue;
+            inFlightJobs.add(job.sessionId);
 
-            console.log(`[CloudPrinterBridge] 📄 New remote print job detected: "${job.originalName}" (Session: ${job.sessionId})`);
+            try {
+              console.log(`[CloudPrinterBridge] 📄 New remote print job detected: "${job.originalName}" (Session: ${job.sessionId})`);
 
-            // Ensure local uploads directory exists
-            if (!fs.existsSync(UPLOAD_DIR)) {
-              fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+              // Ensure local uploads directory exists
+              if (!fs.existsSync(UPLOAD_DIR)) {
+                fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+              }
+
+              // Download file locally to spool to physical printer
+              const safeName = job.originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
+              const tempFilePath = path.join(UPLOAD_DIR, `remote_${job.sessionId}_${safeName}`);
+
+              await downloadFile(job.fileUrl, tempFilePath);
+
+              console.log(`[CloudPrinterBridge] File downloaded to "${tempFilePath}". Spooling to physical printer "${realBrotherPrinterDriver.detectedPrinterName}" (Range: ${job.customPageRange || "ALL"}, Sides: ${job.sides || "SINGLE"})...`);
+              await realBrotherPrinterDriver.startJob(job.sessionId, job.totalPages, tempFilePath, {
+                copies: job.copies,
+                colorMode: job.colorMode as any,
+                sides: job.sides as any,
+                pageRangeMode: job.pageRangeMode as any,
+                customPageRange: job.customPageRange,
+                pagesPerSheet: job.pagesPerSheet,
+              });
+              processedJobs.add(job.sessionId);
+              markSpooledRemote(remoteCloudUrl, job.sessionId);
+            } catch (jobErr: any) {
+              console.error(`[CloudPrinterBridge] Job ${job.sessionId} error (will retry):`, jobErr?.message || jobErr);
+            } finally {
+              inFlightJobs.delete(job.sessionId);
             }
-
-            // Download file locally to spool to physical printer
-            const safeName = job.originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
-            const tempFilePath = path.join(UPLOAD_DIR, `remote_${job.sessionId}_${safeName}`);
-            
-            await downloadFile(job.fileUrl, tempFilePath);
-
-            console.log(`[CloudPrinterBridge] File downloaded to "${tempFilePath}". Spooling to physical printer "${realBrotherPrinterDriver.detectedPrinterName}" (Range: ${job.customPageRange || "ALL"}, Sides: ${job.sides || "SINGLE"})...`);
-            await realBrotherPrinterDriver.startJob(job.sessionId, job.totalPages, tempFilePath, {
-              copies: job.copies,
-              colorMode: job.colorMode as any,
-              sides: job.sides as any,
-              pageRangeMode: job.pageRangeMode as any,
-              customPageRange: job.customPageRange,
-              pagesPerSheet: job.pagesPerSheet,
-            });
-            markSpooledRemote(remoteCloudUrl, job.sessionId);
           }
         } catch (err: any) {
           console.error(`[CloudPrinterBridge] Processing error:`, err?.message || err);
+        } finally {
+          isPolling = false;
         }
       });
     })
-    .on("error", (err) => {
-      // transient network log
+    .on("error", () => {
+      isPolling = false;
     });
 }
 
-function downloadFile(fileUrl: string, destPath: string): Promise<void> {
+function downloadFile(fileUrl: string, destPath: string, redirectsLeft = 3): Promise<void> {
   return new Promise((resolve, reject) => {
     const client = fileUrl.startsWith("https") ? https : http;
-    const file = fs.createWriteStream(destPath);
     client
       .get(fileUrl, (response) => {
+        if (
+          response.statusCode &&
+          [301, 302, 307, 308].includes(response.statusCode) &&
+          response.headers.location &&
+          redirectsLeft > 0
+        ) {
+          const nextUrl = new URL(response.headers.location, fileUrl).toString();
+          response.resume();
+          downloadFile(nextUrl, destPath, redirectsLeft - 1).then(resolve, reject);
+          return;
+        }
         if (response.statusCode !== 200) {
+          response.resume();
           reject(new Error(`Failed to download file: HTTP ${response.statusCode}`));
           return;
         }
+        const file = fs.createWriteStream(destPath);
         response.pipe(file);
         file.on("finish", () => {
           file.close();
           resolve();
+        });
+        file.on("error", (err) => {
+          fs.unlink(destPath, () => undefined);
+          reject(err);
         });
       })
       .on("error", (err) => {

@@ -17,7 +17,12 @@ export interface CreateSessionResponse {
 }
 
 export async function createSession(): Promise<CreateSessionResponse> {
-  const { data } = await client.post<CreateSessionResponse>("/session");
+  const isPublicHost =
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1";
+  const payload = isPublicHost ? { clientOrigin: window.location.origin } : {};
+  const { data } = await client.post<CreateSessionResponse>("/session", payload);
   return data;
 }
 

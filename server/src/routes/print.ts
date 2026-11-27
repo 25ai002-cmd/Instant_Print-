@@ -50,8 +50,9 @@ router.post(
 router.get(
   "/pending-print-jobs",
   asyncHandler(async (req, res) => {
-    const host = (req.headers["x-forwarded-host"] as string) || req.headers.host;
-    const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+    const host = ((req.headers["x-forwarded-host"] as string) || req.headers.host || "").split(",")[0].trim();
+    const rawProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+    const proto = rawProto.split(",")[0].trim();
     const baseUrl = `${proto}://${host}`;
 
     const activeSessions = sessionManager.getAllSessions();
