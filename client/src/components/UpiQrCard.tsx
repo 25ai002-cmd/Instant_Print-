@@ -1,4 +1,7 @@
-import { IndianRupee, ShieldCheck, Zap } from "lucide-react";
+import { useState } from "react";
+import { Check, Copy, IndianRupee } from "lucide-react";
+
+const MERCHANT_UPI_ID = "6353874452@ibl";
 
 interface UpiQrCardProps {
   qrImageDataUrl: string;
@@ -10,13 +13,24 @@ interface UpiQrCardProps {
 }
 
 export function UpiQrCard({
-  qrImageDataUrl,
   amount,
   secondsLeft,
   title = "Scan to Pay via UPI",
   subtitle = "Accepts Google Pay, PhonePe, Paytm, BHIM & all UPI Apps",
   showUpiApps = true,
 }: UpiQrCardProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyUpi = async () => {
+    try {
+      await navigator.clipboard.writeText(MERCHANT_UPI_ID);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore clipboard errors
+    }
+  };
+
   return (
     <div className="relative w-full max-w-sm mx-auto rounded-3xl bg-slate-900 text-white p-6 shadow-2xl border border-slate-800 overflow-hidden">
       {/* Background Ambient Glows */}
@@ -36,16 +50,21 @@ export function UpiQrCard({
         </div>
       )}
 
-      {/* High-Contrast QR Code Container with Center UPI Badge */}
-      <div className="relative mx-auto w-64 h-64 rounded-2xl bg-white p-3 shadow-xl flex items-center justify-center border-4 border-slate-800">
-        <img src={qrImageDataUrl} alt="UPI Payment QR Code" className="w-full h-full object-contain rounded-lg" />
+      {/* PhonePe QR Code Container */}
+      <div className="relative mx-auto w-64 h-64 rounded-2xl bg-black p-2 shadow-xl flex items-center justify-center border-4 border-slate-800 overflow-hidden">
+        <img src="/phonepe-qr.jpg" alt="PhonePe UPI Payment QR Code" className="w-full h-full object-contain rounded-lg" />
+      </div>
 
-        {/* Center UPI Badge Logo */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-slate-900 p-1 border-2 border-emerald-400 shadow-md flex items-center justify-center">
-          <div className="w-full h-full rounded-full bg-emerald-500 flex items-center justify-center text-slate-900 font-extrabold text-[10px] tracking-tighter">
-            UPI
-          </div>
-        </div>
+      {/* UPI ID with Copy Button */}
+      <div className="mt-4 flex justify-center">
+        <button
+          type="button"
+          onClick={handleCopyUpi}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
+        >
+          <span>UPI ID: {MERCHANT_UPI_ID}</span>
+          {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} className="text-slate-400" />}
+        </button>
       </div>
 
       {/* Countdown Timer Badge */}
