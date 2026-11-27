@@ -6,7 +6,7 @@ import { PaymentInfo, PaymentStatus } from "../types/session";
 const Razorpay = require("razorpay");
 
 const PAYMENT_WINDOW_MS = 3 * 60 * 1000; // 3 minute UPI payment window
-const UPI_PAYEE_VPA = process.env.UPI_PAYEE_VPA ?? "printatm@upi";
+const UPI_PAYEE_VPA = process.env.UPI_PAYEE_VPA ?? "6353874452@ibl";
 const UPI_PAYEE_NAME = process.env.UPI_PAYEE_NAME ?? "PrintATM Kiosk";
 
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;

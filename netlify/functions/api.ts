@@ -339,7 +339,7 @@ async function fetchRazorpayOrderStatus(orderId: string): Promise<PaymentStatus>
 async function buildPaymentInfo(amount: number): Promise<PaymentInfo> {
   const live = isRazorpayLive();
   const orderId = live ? await createRazorpayOrder(amount) : `sim_order_${randomUUID()}`;
-  const upiVpa = process.env.UPI_PAYEE_VPA ?? "printatm@upi";
+  const upiVpa = process.env.UPI_PAYEE_VPA ?? "6353874452@ibl";
   const upiName = process.env.UPI_PAYEE_NAME ?? "PrintATM Kiosk";
   const params = new URLSearchParams({
     pa: upiVpa,
