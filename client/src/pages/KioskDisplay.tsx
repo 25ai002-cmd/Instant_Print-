@@ -5,6 +5,7 @@ import { CheckCircle2, Smartphone, QrCode, AlertTriangle, Printer } from "lucide
 import { Logo } from "../components/Logo";
 import { KioskCard } from "../components/KioskCard";
 import { StatusRing } from "../components/StatusRing";
+import { UpiQrCard } from "../components/UpiQrCard";
 import { createSession, deleteSession, getFilePreviewUrl, getPrintStatus, getSession } from "../services/api";
 import { KioskSession } from "../types";
 
@@ -113,8 +114,12 @@ export function KioskDisplay() {
           <PhoneConnectedView key="phone_connected" />
         )}
 
-        {(stage === "FILE_UPLOADED" || stage === "AWAITING_PAYMENT" || stage === "PAYMENT_FAILED") && (
+        {(stage === "FILE_UPLOADED" || stage === "PAYMENT_FAILED") && (
           <ContinueOnPhoneView key="continue" stage={stage} session={session} />
+        )}
+
+        {stage === "AWAITING_PAYMENT" && (
+          <KioskPaymentView key="payment" session={session} />
         )}
 
         {stage === "PRINTING" && (
@@ -194,6 +199,25 @@ function PhoneConnectedView() {
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
         Single-User Session Active · Scanner Locked
       </div>
+    </KioskCard>
+  );
+}
+
+function KioskPaymentView({ session }: { session: KioskSession | null }) {
+  return (
+    <KioskCard className="text-center">
+      <h2 className="font-display text-3xl font-extrabold text-ink mb-2">
+        Scan to Pay
+      </h2>
+      {session?.file?.originalName && (
+        <div className="mb-4 py-1.5 px-4 rounded-control bg-slate-100 font-display font-bold text-sm text-slate-700 inline-block">
+          📄 {session.file.originalName} ({session.file.pageCount} pages)
+        </div>
+      )}
+      <UpiQrCard
+        qrImageDataUrl={session?.payment?.qrImageDataUrl || "/phonepe-qr.jpg"}
+        amount={session?.price?.total}
+      />
     </KioskCard>
   );
 }
