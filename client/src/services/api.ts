@@ -49,20 +49,34 @@ export async function uploadFile(
   file: File,
   onProgress?: (percent: number) => void
 ): Promise<KioskSession> {
-  const form = new FormData();
-  form.append("sessionId", sessionId);
-  form.append("file", file);
+  const attemptUpload = async () => {
+    const form = new FormData();
+    form.append("sessionId", sessionId);
+    form.append("file", file);
 
-  const { data } = await client.post<KioskSession>("/upload", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-    timeout: 120000,
-    onUploadProgress: (evt) => {
-      if (onProgress && evt.total) {
-        onProgress(Math.round((evt.loaded / evt.total) * 100));
-      }
-    },
-  });
-  return data;
+    const { data } = await client.post<KioskSession>("/upload", form, {
+      timeout: 120000,
+      onUploadProgress: (evt) => {
+        if (onProgress && evt.total) {
+          onProgress(Math.round((evt.loaded / evt.total) * 100));
+        }
+      },
+    });
+    return data;
+  };
+
+  try {
+    return await attemptUpload();
+  } catch (err) {
+    const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+    const isTransient =
+      !status || status === 502 || status === 503 || status === 504;
+    if (isTransient) {
+      await new Promise((r) => setTimeout(r, 600));
+      return await attemptUpload();
+    }
+    throw err;
+  }
 }
 
 export async function calculatePrice(

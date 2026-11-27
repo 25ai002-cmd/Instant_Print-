@@ -101,6 +101,10 @@ const SESSIONS_STORE = "printatm-sessions";
 const FILES_STORE = "printatm-files";
 const CODES_STORE = "printatm-codes";
 
+function blobStore(name: string) {
+  return getStore({ name, consistency: "strong" });
+}
+
 const RATES = {
   BW_PER_PAGE: 2,
   COLOR_PER_PAGE: 10,
@@ -147,7 +151,7 @@ function getBaseUrl(req: Request, clientOrigin?: string): string {
 }
 
 async function getSession(id: string): Promise<KioskSession | null> {
-  const store = getStore(SESSIONS_STORE);
+  const store = blobStore(SESSIONS_STORE);
   const session = (await store.get(id, { type: "json" })) as KioskSession | null;
   if (!session) return null;
   if (Date.now() > session.expiresAt) {
@@ -158,7 +162,7 @@ async function getSession(id: string): Promise<KioskSession | null> {
 }
 
 async function saveSession(session: KioskSession): Promise<KioskSession> {
-  const store = getStore(SESSIONS_STORE);
+  const store = blobStore(SESSIONS_STORE);
   const updated: KioskSession = {
     ...session,
     updatedAt: Date.now(),
@@ -417,8 +421,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     // DELETE /session/:id
     if (req.method === "DELETE" && sessionGetMatch) {
       const id = sessionGetMatch[1];
-      await getStore(SESSIONS_STORE).delete(id);
-      await getStore(FILES_STORE).delete(id);
+      await blobStore(SESSIONS_STORE).delete(id);
+      await blobStore(FILES_STORE).delete(id);
       return new Response(null, { status: 204 });
     }
 
@@ -490,10 +494,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       const accessCode = generateAccessCode();
       meta.accessCode = accessCode;
 
-      await getStore(FILES_STORE).set(sessionId, arrayBuffer, {
+      await blobStore(FILES_STORE).set(sessionId, arrayBuffer, {
         metadata: { originalName: fileEntry.name, mimeType: meta.mimeType },
       });
-      await getStore(CODES_STORE).set(accessCode, sessionId);
+      await blobStore(CODES_STORE).set(accessCode, sessionId);
 
       const updated = await saveSession({
         ...session,
@@ -509,7 +513,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     if (req.method === "GET" && previewMatch) {
       const id = previewMatch[1];
       const session = await getSession(id);
-      const fileBlob = await getStore(FILES_STORE).getWithMetadata(id, { type: "arrayBuffer" });
+      const fileBlob = await blobStore(FILES_STORE).getWithMetadata(id, { type: "arrayBuffer" });
       if (!fileBlob || !fileBlob.data) {
         return new Response("File not found", { status: 404 });
       }
@@ -660,7 +664,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     // GET /pending-print-jobs (Polled by laptop's local printer bridge on any Wi-Fi)
     if (req.method === "GET" && route === "/pending-print-jobs") {
       const baseUrl = getBaseUrl(req);
-      const store = getStore(SESSIONS_STORE);
+      const store = blobStore(SESSIONS_STORE);
       const { blobs } = await store.list();
       const pendingJobs = [];
 
@@ -728,7 +732,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     // DB Document access code endpoints
     if (req.method === "GET" && route === "/db/documents") {
-      const store = getStore(SESSIONS_STORE);
+      const store = blobStore(SESSIONS_STORE);
       const { blobs } = await store.list();
       const docs = [];
       for (const blob of blobs) {
@@ -761,7 +765,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
     const codeMatch = route.match(/^\/db\/document\/code\/([^/]+)$/);
     if (req.method === "GET" && codeMatch) {
-      const sessionId = await getStore(CODES_STORE).get(codeMatch[1], { type: "text" });
+      const sessionId = await blobStore(CODES_STORE).get(codeMatch[1], { type: "text" });
       if (!sessionId) {
         return errorResponse("No document found matching this access code.", 404, "DOCUMENT_NOT_FOUND");
       }
@@ -794,7 +798,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     if (req.method === "POST" && route === "/db/load-session") {
       const { accessCode, kioskSessionId } = (await req.json()) as { accessCode: string; kioskSessionId?: string };
       if (!accessCode) return errorResponse("Access code is required", 400);
-      const sourceId = await getStore(CODES_STORE).get(accessCode, { type: "text" });
+      const sourceId = await blobStore(CODES_STORE).get(accessCode, { type: "text" });
       if (!sourceId) return errorResponse("Document code not found.", 404, "DOCUMENT_NOT_FOUND");
       const sourceSession = await getSession(sourceId);
       if (!sourceSession?.file) return errorResponse("Document code not found.", 404, "DOCUMENT_NOT_FOUND");
@@ -802,9 +806,9 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       if (kioskSessionId && kioskSessionId !== sourceId) {
         const target = await getSession(kioskSessionId);
         if (target) {
-          const fileData = await getStore(FILES_STORE).getWithMetadata(sourceId, { type: "arrayBuffer" });
+          const fileData = await blobStore(FILES_STORE).getWithMetadata(sourceId, { type: "arrayBuffer" });
           if (fileData?.data) {
-            await getStore(FILES_STORE).set(kioskSessionId, fileData.data, { metadata: fileData.metadata });
+            await blobStore(FILES_STORE).set(kioskSessionId, fileData.data, { metadata: fileData.metadata });
           }
           const updated = await saveSession({
             ...target,
