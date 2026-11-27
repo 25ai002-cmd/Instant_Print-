@@ -84,17 +84,6 @@ export function UpiQrCard({
         <h3 className="font-display text-base font-bold text-slate-100">{title}</h3>
         <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
       </div>
-
-      {/* Supported UPI Apps Bar */}
-      {showUpiApps && (
-        <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-center gap-2 text-slate-400 flex-wrap">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mr-1">Accepting:</span>
-          <span className="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-extrabold text-blue-400 border border-slate-700">GPay</span>
-          <span className="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-extrabold text-purple-400 border border-slate-700">PhonePe</span>
-          <span className="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-extrabold text-sky-400 border border-slate-700">Paytm</span>
-          <span className="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-extrabold text-emerald-400 border border-slate-700">BHIM</span>
-        </div>
-      )}
     </div>
   );
 }
